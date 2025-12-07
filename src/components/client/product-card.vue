@@ -16,7 +16,7 @@
         <StarRating
         :rating="product.rating"
         :read-only="true"
-        :increment="0.5"
+        :increment="0.1"
         :star-size="25"
         />
     </div>
