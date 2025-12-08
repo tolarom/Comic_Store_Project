@@ -1,9 +1,4 @@
 <template>
-<div>
-  <button><router-link to="/SignUpPage" class="ttext-indigo-600 hover:underline">Sign up here</router-link></button>
-  <button><router-link to="/LoginPage" class="text-indigo-600">Log In here</router-link></button>
-</div>
-
   <footer class=" bg-black text-white py-16 px-6 lg:px-20">
     <div class="w-full max-w-screen-2xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
       <!-- ABOUT THE SHOP -->
@@ -61,15 +56,6 @@
         </iframe>
       </div>
     </div>
-
-    <!-- Floating "Go to top" button -->
-    <button
-      @click="scrollToTop"
-      aria-label="Go to top"
-      class="fixed bottom-6 right-6 bg-white text-black py-2 px-4 rounded-lg shadow-lg hover:opacity-90 transition"
-    >
-      Go to top
-    </button>
   </footer>
 </template>
 

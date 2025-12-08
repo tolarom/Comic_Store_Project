@@ -1,21 +1,40 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import HomePage from '@/components/client/HomePage.vue'
-import LoginPage from '@/components/client/LogIn-Page.vue'
-import SignUpPage from '@/components/client/SignUp-Page.vue'
+import footer from '@/components/client/FooterPage.vue'
+import navigationBar from '@/components/client/NavigationBar.vue'
+import LoginPage from '@/views/authorize/LogIn-Page.vue'
+import SignUpPage from '@/views/authorize/SignUp-Page.vue'
 
 const routes = [
-  { path: '/',
-   name: 'Home',
-   component: HomePage },
-  { path: '/LoginPage',
-   name: 'LoginPage',
-   component: LoginPage },
-  { path: '/SignUp',
-   name: 'SignUp',
-   component: SignUpPage },
-  { path: '/:pathMatch(.*)*',
-    redirect: '/' },
+  { 
+    path: '/',
+    name: 'Home',
+    component: '' 
+  },
+  { 
+    path: '/LoginPage',
+    name: 'LoginPage',
+    component: LoginPage 
+  },
+  { path: '/SignUpPage',
+    name: 'SignUpPage',
+    component: SignUpPage 
+  },
+  { 
+    path: '/:pathMatch(.*)*',
+    redirect: '/' 
+  },
+  {
+    name: 'Footer',
+    path: '/Footer',
+    component: footer
+  },
+  {
+    name: 'NavigationBar',
+    path: '/NavigationBar',
+    component: navigationBar
+  },
+
 ]
 
 const router = createRouter({
