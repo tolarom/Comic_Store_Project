@@ -59,7 +59,7 @@
 
           <p class="text-center text-sm text-gray-700">
             Don't have an account?
-              <router-link to="/SignUpPage" class="ttext-indigo-600 hover:underline">Sign up here</router-link>
+              <router-link to="/SignUpPage" class="text-indigo-600">Sign Up here</router-link>
           </p>
           <!-- <div>my good code</div> -->
           <!-- Divider -->
