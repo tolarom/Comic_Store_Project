@@ -1,21 +1,23 @@
-<script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+<script lang="ts">
+import productCard from "./components/client/product-card.vue";
+export default {
+  components: {
+    productCard
+  }
+};
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
+    <productCard
+      :product="{
+        image: 'https://media.burford.co.uk/images/SNY04089.jpg_edit.width-640_ln7jm6QxYVkHFHaT.jpg',
+        title: 'Sample Product',
+        description: 'This is a sample product description.',
+        price: 29.99,
+        discount: 10,
+        rating: 3.5
+      }">
+    </productCard>
 
-    <div class="wrapper">
-      <HelloWorld msg="You did it!" />
-
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-
-  <RouterView />
 </template>
 
