@@ -2,8 +2,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import footer from '@/components/client/FooterPage.vue'
 import navigationBar from '@/components/client/NavigationBar.vue'
-import LoginPage from '@/views/authorize/LogIn-Page.vue'
-import SignUpPage from '@/views/authorize/SignUp-Page.vue'
+import LoginPage from '@/views/Client/LogIn-Page.vue'
+import SignUpPage from '@/views/Client/SignUp-Page.vue'
+import ProductCard from '@/components/client/product-card.vue'
+import ShopCard from '@/views/Client/ShopCard.vue'
+import Checkout from '@/views/Client/Checkout.vue'
+import Profile from '@/views/Client/profileview.vue'
 
 const routes = [
   { 
@@ -12,11 +16,11 @@ const routes = [
     component: '' 
   },
   { 
-    path: '/LoginPage',
+    path: '/loginPage',
     name: 'LoginPage',
     component: LoginPage 
   },
-  { path: '/SignUpPage',
+  { path: '/signUpPage',
     name: 'SignUpPage',
     component: SignUpPage 
   },
@@ -26,14 +30,36 @@ const routes = [
   },
   {
     name: 'Footer',
-    path: '/Footer',
+    path: '/footer',
     component: footer
   },
   {
     name: 'NavigationBar',
-    path: '/NavigationBar',
+    path: '/navigationbar',
     component: navigationBar
   },
+  {
+    name: 'ProductCard',
+    path: '/productCard',
+    component: ProductCard
+    },
+  {
+    name: 'ShopCard',
+    path: '/shopcard',
+    component: ShopCard
+
+   },
+   {
+    name: 'CheckOut',
+    path: '/checkout',
+    component: Checkout
+   },
+   {
+    name: 'Profile',
+    path: '/profile',
+    component: Profile
+   },
+   
 
 ]
 

@@ -34,9 +34,15 @@
 
       <!-- Right Icons -->
       <div class="hidden md:flex gap-4 text-lg">
-        <div class="pi pi-search cursor-pointer"></div>
-        <div class="pi pi-user cursor-pointer"></div>
-        <div class="pi pi-shopping-cart cursor-pointer"></div>
+        <router-link to="/searchbar" class="cursor-pointer">
+      <i class="pi pi-search text-2xl"></i>
+    </router-link>  
+        <router-link to="/profile" class="cursor-pointer">
+      <i class="pi pi-user text-2xl"></i>
+    </router-link>  
+        <router-link to="/shopcard" class="cursor-pointer">
+      <i class="pi pi-shopping-cart text-2xl"></i>
+    </router-link>        
       </div>
 
       <!-- Mobile Hamburger -->
