@@ -8,12 +8,14 @@ import ProductCard from '@/components/client/product-card.vue'
 import ShopCard from '@/views/Client/ShopCard.vue'
 import Checkout from '@/views/Client/Checkout.vue'
 import Profile from '@/views/Client/profileview.vue'
+import Homeview from '@/views/Client/Homeview.vue'
+import SearchBar from '@/components/client/SearchBar.vue'
 
 const routes = [
   { 
     path: '/',
-    name: 'Home',
-    component: '' 
+    name: 'Homeview',
+    component: Homeview 
   },
   { 
     path: '/loginPage',
@@ -59,7 +61,13 @@ const routes = [
     path: '/profile',
     component: Profile
    },
+   {
+    name: 'SearchBar',
+    path: '/searchbar',
+    component: SearchBar
+   }
    
+
 
 ]
 
