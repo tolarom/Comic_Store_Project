@@ -1,14 +1,14 @@
 <template>
-  <footer class=" bg-black text-white py-16 px-6 lg:px-20">
+  <footer class="bg-black text-white pt-24 pb-16 px-6 lg:px-20 mt-32">
     <div class="w-full max-w-screen-2xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
       <!-- ABOUT THE SHOP -->
       <div>
         <h2 class="font-semibold text-2xl tracking-widest mb-4">ABOUT THE SHOP</h2>
         <p class="text-sm leading-relaxed mb-4">
-          Comic is a retail experience created for fans of all things Japanese lifestyle and culture. We carry exclusive officially licensed apparel, accessories, and more.
+          Comic is a retail experience created especially for fans of Comic and Anime. We carry exclusive officially licensed apparel,figure, accessories, and more.
         </p>
         <p class="text-sm leading-relaxed mb-4">
-          The store is run by our namesake herself, Comic Store, and her fuzzy little companion, Nuki. They're here to make sure you feel welcome and find everything you're looking for.
+          The store is run by ourself, Comic Store, and her fuzzy little companion, Nuki. They're here to make sure you feel welcome and find everything you're looking for.
         </p>
         <br>
         <br><br><br>
@@ -21,26 +21,26 @@
 
         <p class="text-xl mb-2">FOLLOW US</p>
         <div class="flex space-x-4 text-lg mb-6 ">
-          <img src="/images/facebook.png" alt="" class="w-7 ">
-          <img src="/images/image.png" alt="" class="w-7 ">
-          <img src="/images/instagram.png" alt="" class="w-7">
-          <img src="/images/telegram.png" alt="" class="w-7">
+          <a href="https://www.facebook.com/nachooloveu/" target="_blank"><img src="/images/facebook.png" alt="" class="w-7 "></a>
+          <a href=""><img src="/images/image.png" alt="" class="w-7 "></a>
+          <a href="https://www.instagram.com/wolf.harleyy/" target="_blank"><img src="/images/instagram.png" alt="" class="w-7"></a>
+          <a href="https://t.me/ilovesharkishark" target="_blank"><img src="/images/telegram.png" alt="" class="w-7"></a>
         </div>
 
-        <div class="flex items-center space-x-3 mb-4">
+        <a href="tel:012345678" class="flex items-center space-x-3 mb-4">
           <img src="/images/phone-call.png" alt="" class="w-7">
-          <span class="text-sm">+855 - XXXXXXXXX</span>
-        </div>
+          <span class="text-sm">+855 - 12345678</span>
+        </a>
 
-        <div class="flex items-center space-x-3 mb-4">
+        <a href="mailto:support@gmail.com" class="flex items-center space-x-3 mb-4">
           <img src="/images/communication.png" alt="" class="w-7">
           <span class="text-sm">support@gmail.com</span>
-        </div>
+        </a>
 
-        <div class="flex items-center space-x-3">
+        <a href="https://maps.app.goo.gl/We312ZRuX3z1vtHs6" target="_blank" class="flex items-center space-x-3">
           <img src="/images/google-maps.png" alt="" class="w-7">
           <span class="text-sm leading-relaxed">Russian Conf Norodom Boulevard,Phnom Penh 120404</span>
-        </div>
+        </a>
       </div>
 
       <!-- MAP SECTION -->
