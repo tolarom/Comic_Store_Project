@@ -1,6 +1,5 @@
 <template>
-  <div><Header /></div>
-  <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
+  <div class="min-h-screen bg-gray-50 p-6">
     <div class="w-full">
       <!-- Breadcrumb -->
       <div class="flex items-center text-sm text-gray-600 mb-4">
@@ -278,13 +277,9 @@
 
 <script>
 import { ref } from 'vue';
-import Header from '../../components/Admin/NavigationBar.vue';
 
 export default {
   name: 'SettingsPage',
-  components: {
-    Header,
-  },
   setup() {
     const photoInput = ref(null);
     const originalSettings = ref(null);

@@ -1,7 +1,5 @@
 <template>
-
-  <div><Header /></div>
-  <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
+  <div class="min-h-screen bg-gray-50 p-6">
     <div class="mx-auto">
       <!-- Breadcrumb -->
       <div class="flex items-center text-sm text-gray-600 mb-4">
@@ -520,15 +518,13 @@ const ProductModal = defineComponent({
     </div>
   `
 });
-import Header from '../../components/Admin/NavigationBar.vue';
+
 export default {
   name: 'EcommercePage',
   components: {
     ProductCard,
-    ProductModal,
-    Header
+    ProductModal
   },
-
   setup() {
     const searchQuery = ref('');
     const selectedCategory = ref('All Categories');

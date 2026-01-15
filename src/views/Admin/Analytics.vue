@@ -1,6 +1,5 @@
 <template>
-  <div><Header /></div>
-  <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
+  <div class="min-h-screen bg-gray-50 p-6">
     <div class="mx-auto">
       <!-- Header -->
       <div class="mb-8">
@@ -151,7 +150,6 @@
 <script>
 import { ref, onMounted, onBeforeUnmount, defineComponent } from 'vue';
 import Chart from 'chart.js/auto';
-import Header from '../../components/Admin/NavigationBar.vue';
 
 // MetricCard Component
 const MetricCard = defineComponent({
@@ -181,8 +179,7 @@ const MetricCard = defineComponent({
 export default {
   name: 'AnalyticsDashboard',
   components: {
-    MetricCard,
-    Header,
+    MetricCard
   },
   setup() {
     const userGrowthChart = ref(null);

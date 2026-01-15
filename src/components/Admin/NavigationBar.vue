@@ -1,16 +1,22 @@
 <template>
   <div>
     <!-- Navigation Bar -->
-    <nav  class="bg-gradient-to-r from-indigo-600 to-blue-500 shadow-lg fixed top-0 left-0 right-0 z-50">
+    <nav class="bg-gradient-to-r from-indigo-600 to-blue-500 shadow-lg relative z-50">
       <div class="flex items-center justify-between h-14 px-4">
-        <!-- Left Section - Logo -->
+        <!-- Left Section - Logo and Menu -->
         <div class="flex items-center gap-4">
           <div class="flex items-center">
             <router-link to="/">
               <img src="/logo.png" alt="" class="h-[30px] w-[100px]" />
             </router-link>
           </div>
-           <span class="mx-2 text-gray-400 ml-4 md:ml-12 lg:ml-30">|</span>
+          <span class="mx-2 text-gray-400 ml-4 md:ml-12 lg:ml-30">|</span>
+          <button
+            class="text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
+            @click="toggleSidebar"
+          >
+            <i class="pi pi-bars text-2xl"></i>
+          </button>
         </div>
 
         <!-- Center Section - Search -->
@@ -233,25 +239,44 @@
       </div>
     </transition>
 
-    <!-- Sidebar - Always Open (No Overlay) -->
-    <aside
-      class="fixed left-0 top-14 h-[calc(100vh-3.5rem)] w-64 bg-white shadow-2xl z-50 overflow-y-auto"
-    >
-      <div class="p-4">
-        <nav class="space-y-1">
-          <router-link
-            v-for="item in menuItems"
-            :key="item.name"
-            :to="item.link"
-            class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-gray-700 hover:bg-gray-100"
-            exact-active-class="bg-blue-50 text-blue-600 font-medium"
-          >
-            <span class="text-xl">{{ item.iconPlaceholder }}</span>
-            <span class="font-medium">{{ item.name }}</span>
-          </router-link>
-        </nav>
-      </div>
-    </aside>
+    <!-- Sidebar Overlay -->
+    <transition name="fade">
+      <div
+        v-if="sidebarOpen"
+        class="fixed inset-0 top-14 bg-black/50 z-40 transition-opacity duration-300"
+        @click="closeSidebar"
+      ></div>
+    </transition>
+
+    <!-- Sidebar -->
+    <transition name="slide">
+      <aside
+        v-if="sidebarOpen"
+        class="fixed left-0 top-14 h-[calc(100vh-3.5rem)] w-64 bg-white shadow-2xl z-50 overflow-y-auto"
+        @click.stop
+      >
+        <div class="p-4">
+          <nav class="space-y-1">
+            <router-link
+              v-for="item in menuItems"
+              :key="item.name"
+              :to="item.link"
+              class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors"
+              :class="[
+                item.active
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100'
+              ]"
+              exact-active-class="bg-blue-50 text-blue-600 font-medium"
+              @click="closeSidebar"
+            >
+              <span class="text-xl">{{ item.iconPlaceholder }}</span>
+              <span class="font-medium">{{ item.name }}</span>
+            </router-link>
+          </nav>
+        </div>
+      </aside>
+    </transition>
   </div>
 </template>
 
@@ -265,7 +290,7 @@ export default {
       showNotifications: false,
       showUserMenu: false,
       showThemeMenu: false,
-      sidebarOpen: true, // Changed to true to keep sidebar open by default
+      sidebarOpen: false,
       showMobileSearch: false,
       themeMode: 'system',
       notificationCount: 2,
@@ -282,27 +307,32 @@ export default {
         {
           name: 'Dashboard',
           iconPlaceholder: '📊',
-          link: '/admin/dashboard'
+          link: '/admin/dashboard',
+          active: true
         },
         {
           name: 'Analytics',
           iconPlaceholder: '📈',
-          link: '/analytics'
+          link: '/analytics',
+          active: false
         },
         {
           name: 'E-Commerce',
           iconPlaceholder: '🛒',
-          link: '/e-commerce'
+          link: '/e-commerce',
+          active: false
         },
         {
           name: 'Profile',
           iconPlaceholder: '👤',
-          link: '/admin_profile'
+          link: '/admin_profile',
+          active: false
         },
         {
           name: 'Settings',
           iconPlaceholder: '⚙️',
-          link: '/setting'
+          link: '/setting',
+          active: false
         }
       ]
     }
@@ -369,11 +399,16 @@ export default {
     },
 
     toggleSidebar() {
-      // Sidebar is always open, no toggle needed
+      this.sidebarOpen = !this.sidebarOpen
+      if (this.sidebarOpen) {
+        this.showThemeMenu = false
+        this.showNotifications = false
+        this.showUserMenu = false
+      }
     },
 
     closeSidebar() {
-      // Sidebar is always open, no close needed
+      this.sidebarOpen = false
     },
 
     handleNotificationClick(notification) {
