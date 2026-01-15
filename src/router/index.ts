@@ -1,79 +1,168 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import footer from '@/components/client/FooterPage.vue'
-import navigationBar from '@/components/client/NavigationBar.vue'
-import LoginPage from '@/views/Client/LogIn-Page.vue'
-import SignUpPage from '@/views/Client/SignUp-Page.vue'
-import ProductCard from '@/components/client/product-card.vue'
-import ShopCard from '@/views/Client/ShopCard.vue'
-import Checkout from '@/views/Client/Checkout.vue'
-import Profile from '@/views/Client/profileview.vue'
-import Homeview from '@/views/Client/Homeview.vue'
-import SearchBar from '@/components/client/SearchBar.vue'
+import LoginPage from '@/views/authorize/LogIn-Page.vue'
+import SignUpPage from '@/views/authorize/SignUp-Page.vue'
+import ShopCart from '@/views/Client/ShopCart-Page.vue'
+import Checkout from '@/views/Client/Checkout-Page.vue'
+import Profile from '@/views/Client/profileview-Page.vue'
+import Homeview from '@/views/Client/Homeview-Page.vue'
+import ProductPage from '@/views/Client/product-page.vue'
+import ProductDetail from '@/views/Client/Product-detail.vue'
+import RatingPage from '@/views/Client/Rating-Page.vue'
+import Analytics from '@/views/Admin/Analytics.vue'
+import AdminDashboard from '@/views/Admin/Dashboard.vue'
+import ECommerce from '@/views/Admin/E-Commerce.vue'
+import Admin_profile from '@/views/Admin/Admin_profile.vue'
+import Setting from '@/views/Admin/Setting.vue'
 
 const routes = [
-  { 
-    path: '/',
-    name: 'Homeview',
-    component: Homeview 
-  },
-  { 
+  // Authentication routes (public)
+  {
     path: '/loginPage',
     name: 'LoginPage',
-    component: LoginPage 
+    component: LoginPage,
+    meta: { requiresAuth: false, title: 'Login' },
   },
-  { path: '/signUpPage',
+  {
+    path: '/signUpPage',
     name: 'SignUpPage',
-    component: SignUpPage 
+    component: SignUpPage,
+    meta: { requiresAuth: false, title: 'Sign Up' },
   },
-  { 
-    path: '/:pathMatch(.*)*',
-    redirect: '/' 
-  },
-  {
-    name: 'Footer',
-    path: '/footer',
-    component: footer
-  },
-  {
-    name: 'NavigationBar',
-    path: '/navigationbar',
-    component: navigationBar
-  },
-  {
-    name: 'ProductCard',
-    path: '/productCard',
-    component: ProductCard
-    },
-  {
-    name: 'ShopCard',
-    path: '/shopcard',
-    component: ShopCard
 
-   },
-   {
-    name: 'CheckOut',
+  // Home and main routes
+  {
+    path: '/',
+    name: 'Homeview',
+    component: Homeview,
+  },
+  {
+    path: '/shop',
+    name: 'Shop',
+    component: Homeview,
+  },
+// Protected client routes (require authentication)
+
+  // Product routes
+  {
+    path: '/productpage',
+    name: 'ProductPage',
+    component: ProductPage,
+    meta: { title: 'Shop' },
+  },
+  {
+    path: '/productdescription/:id',
+    name: 'ProductDetail',
+    component: ProductDetail,
+    meta: { title: 'Product Details' },
+  },
+
+  
+  {
+    path: '/shopcart',
+    name: 'ShopCart',
+    component: ShopCart,
+    meta: { title: 'Shopping Cart' },
+  },
+  {
     path: '/checkout',
-    component: Checkout
-   },
-   {
-    name: 'Profile',
+    name: 'CheckOut',
+    component: Checkout,
+    meta: { title: 'Checkout' },
+  },
+  {
     path: '/profile',
-    component: Profile
-   },
-   {
-    name: 'SearchBar',
-    path: '/searchbar',
-    component: SearchBar
-   }
-   
+    name: 'Profile',
+    component: Profile,
+    meta: { title: 'My Profile' },
+  },
+  {
+    path: '/rating',
+    name: 'Rating',
+    component: RatingPage,
+    meta: { title: 'Leave a Rating' },
+  },
 
+  // Admin routes
+  {
+    path: '/admin',
+    redirect: '/admin/dashboard',
+  },
+  {
+    path: '/admin/dashboard',
+    name: 'Dashboard',
+    component: AdminDashboard,
+  },
+  {
+    path: '/analytics',
+    name: 'Analytics',
+    component: Analytics,
+  },
+  {
+    path: '/e-commerce',
+    name: 'ECommerce',
+    component: ECommerce,
+  },
+  {
+    path: '/admin_profile',
+    name: 'AdminProfile',
+    component: Admin_profile,
+  },
+  {
+    path: '/setting',
+    name: 'Setting',
+    component: Setting,
+  },
 
+  // Catch-all route for 404 - MUST BE LAST
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/',
+    meta: { title: 'Not Found' },
+  },
 ]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+  scrollBehavior() {
+    return { top: 0 }
+  },
+})
+
+// Route guard for authentication and logging
+router.beforeEach((to, from, next) => {
+  // Update document title
+  const title = to.meta.title ? `${to.meta.title} - Comic Store` : 'Comic Store'
+  document.title = title
+
+  // Check if user is authenticated
+  const isAuthenticated = !!localStorage.getItem('authToken')
+
+  // Redirect to login if trying to access protected routes without auth
+  if (
+    to.meta.requiresAuth !== false &&
+    !isAuthenticated &&
+    to.path !== '/' &&
+    to.path !== '/shop'
+  ) {
+    // Allow public routes
+    if (to.path !== '/loginPage' && to.path !== '/signUpPage') {
+      return next('/loginPage')
+    }
+  }
+
+  // Redirect already logged in users away from login/signup pages
+  if (isAuthenticated && (to.path === '/loginPage' || to.path === '/signUpPage')) {
+    return next('/')
+  }
+
+  next()
+})
+
+// Log navigation for debugging
+router.afterEach((to) => {
+  console.log(`Navigated to: ${to.path}`)
 })
 
 export default router
