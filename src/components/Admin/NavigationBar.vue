@@ -5,11 +5,12 @@
       <div class="flex items-center justify-between h-14 px-4">
         <!-- Left Section - Logo and Menu -->
         <div class="flex items-center gap-4">
-          <div class="flex items-center ">
-            <router-link to="/"><img src="/logo.png" alt="" class="h-[30px] w-[100px]"></router-link>
+          <div class="flex items-center">
+            <router-link to="/">
+              <img src="/logo.png" alt="" class="h-[30px] w-[100px]" />
+            </router-link>
           </div>
-          <span class="mx-2 text-gray-400 ml-4 md:ml-12 lg:ml-30">&vert;</span>
-
+          <span class="mx-2 text-gray-400 ml-4 md:ml-12 lg:ml-30">|</span>
           <button
             class="text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
             @click="toggleSidebar"
@@ -22,12 +23,11 @@
         <div class="flex-1 max-w-md mx-4">
           <!-- Desktop Search Bar -->
           <div class="relative hidden md:block">
-            <!-- Search Icon -->
-            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10">
+            <span
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10"
+            >
               <i class="pi pi-search text-xl"></i>
             </span>
-
-            <!-- Search Input -->
             <input
               v-model="searchQuery"
               type="text"
@@ -39,7 +39,6 @@
                     transition-all duration-200 bg-white"
             />
           </div>
-
           <!-- Mobile Search Icon -->
           <button
             @click="toggleMobileSearch"
@@ -49,19 +48,18 @@
           </button>
         </div>
 
-        <!-- Right Section - Theme Toggle, Notifications and User -->
+        <!-- Right Section - Theme, Notifications, User -->
         <div class="flex items-center gap-1 md:gap-2">
-          <!-- Theme Toggle Button with Dropdown -->
+          <!-- Theme Toggle -->
           <div class="relative">
             <button
-              @click="showThemeMenu = !showThemeMenu"
+              @click="toggleThemeMenu"
               class="text-white hover:bg-white/10 p-1.5 md:p-2 rounded-lg transition-colors"
               :title="themeMode === 'light' ? 'Light Mode' : themeMode === 'dark' ? 'Dark Mode' : 'System Theme'"
             >
               <i :class="getThemeIcon()" class="text-lg md:text-xl"></i>
             </button>
-
-            <!-- Theme Menu Dropdown -->
+            <!-- Theme Dropdown -->
             <div
               v-if="showThemeMenu"
               class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50 overflow-hidden"
@@ -99,10 +97,10 @@
             </div>
           </div>
 
-          <!-- Notifications Icon with Badge -->
+          <!-- Notifications -->
           <div class="relative">
             <button
-              @click="showNotifications = !showNotifications"
+              @click="toggleNotifications"
               class="text-white hover:bg-white/10 p-1.5 md:p-2 rounded-lg transition-colors"
             >
               <i class="pi pi-bell text-lg md:text-xl"></i>
@@ -113,7 +111,6 @@
                 {{ notificationCount }}
               </span>
             </button>
-
             <!-- Notifications Dropdown -->
             <div
               v-if="showNotifications"
@@ -144,13 +141,15 @@
             </div>
           </div>
 
-          <!-- User Profile Dropdown (Desktop) -->
+          <!-- User Profile (Desktop) -->
           <div class="relative hidden md:block">
             <button
-              @click="showUserMenu = !showUserMenu"
+              @click="toggleUserMenu"
               class="flex items-center gap-2 hover:bg-white/10 px-3 py-2 rounded-lg transition-colors"
             >
-              <div class="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+              <div
+                class="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              >
                 {{ userData.avatar }}
               </div>
               <div class="hidden lg:block text-left">
@@ -158,8 +157,7 @@
                 <div class="text-blue-100 text-xs">{{ userData.email }}</div>
               </div>
             </button>
-
-            <!-- User Menu Dropdown -->
+            <!-- User Dropdown -->
             <div
               v-if="showUserMenu"
               class="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl z-50 overflow-hidden"
@@ -199,122 +197,93 @@
             </div>
           </div>
 
-          <!-- User Avatar Icon (Mobile) -->
+          <!-- Mobile User Avatar -->
           <button
-            @click="showUserMenu = !showUserMenu"
+            @click="toggleUserMenu"
             class="md:hidden text-white hover:bg-white/10 p-1.5 rounded-lg transition-colors"
           >
-            <div class="w-7 h-7 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold text-xs">
+            <div
+              class="w-7 h-7 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold text-xs"
+            >
               {{ userData.avatar }}
             </div>
           </button>
-
-          <!-- Mobile User Menu Dropdown -->
-          <div
-            v-if="showUserMenu"
-            class="md:hidden absolute right-4 top-16 w-56 bg-white rounded-lg shadow-xl z-50 overflow-hidden"
-          >
-            <div class="px-4 py-3 border-b">
-              <p class="font-semibold text-gray-900">{{ userData.name }}</p>
-              <p class="text-sm text-gray-500">{{ userData.email }}</p>
-            </div>
-            <div class="py-2">
-              <button
-                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                @click="goToProfile"
-              >
-                Profile Settings
-              </button>
-              <button
-                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                @click="goToMyComics"
-              >
-                My Comics
-              </button>
-              <button
-                class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                @click="goToPreferences"
-              >
-                Preferences
-              </button>
-            </div>
-            <div class="border-t py-2">
-              <button
-                class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                @click="handleLogout"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </nav>
 
     <!-- Mobile Search Overlay -->
-    <div
-      v-if="showMobileSearch"
-      class="md:hidden fixed top-14 left-0 right-0 bg-white shadow-lg z-40 p-4"
-    >
-      <div class="relative">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
-          <i class="pi pi-search text-xl"></i>
-        </span>
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search..."
-          @keydown.enter="handleSearch"
-          class="w-full pl-10 pr-4 py-2.5 rounded-[10px]
-                border border-gray-300
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                transition-all duration-200"
-          autofocus
-        />
+    <transition name="fade">
+      <div
+        v-if="showMobileSearch"
+        class="md:hidden fixed top-14 left-0 right-0 bg-white shadow-lg z-40 p-4"
+      >
+        <div class="relative">
+          <span
+            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+          >
+            <i class="pi pi-search text-xl"></i>
+          </span>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search..."
+            @keydown.enter="handleSearch"
+            class="w-full pl-10 pr-4 py-2.5 rounded-[10px]
+                  border border-gray-300
+                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
+                  transition-all duration-200"
+            autofocus
+          />
+        </div>
       </div>
-    </div>
+    </transition>
 
-    <!-- Sidebar Overlay (only covers content below navbar) -->
-    <div
-      v-if="sidebarOpen"
-      class="fixed inset-0 top-14  bg-opacity-50 z-30 transition-opacity duration-300"
-      @click="closeSidebar"
-    >
-      <!-- Sidebar -->
+    <!-- Sidebar Overlay -->
+    <transition name="fade">
+      <div
+        v-if="sidebarOpen"
+        class="fixed inset-0 top-14 bg-black/50 z-40 transition-opacity duration-300"
+        @click="closeSidebar"
+      ></div>
+    </transition>
+
+    <!-- Sidebar -->
+    <transition name="slide">
       <aside
-        class="absolute left-0 top-0 h-full w-64 bg-white shadow-2xl transform transition-transform duration-300"
-        :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+        v-if="sidebarOpen"
+        class="fixed left-0 top-14 h-[calc(100vh-3.5rem)] w-64 bg-white shadow-2xl z-50 overflow-y-auto"
         @click.stop
       >
         <div class="p-4">
-          <!-- Menu Items -->
           <nav class="space-y-1">
-            <a
+            <router-link
               v-for="item in menuItems"
               :key="item.name"
-              :href="item.link"
+              :to="item.link"
+              class="flex items-center gap-3 px-4 py-3 rounded-lg transition-colors"
               :class="[
-                'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors',
                 item.active
-                  ? 'bg-blue-50 text-blue-600'
+                  ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-100'
               ]"
-              @click.prevent="navigateTo(item)"
+              exact-active-class="bg-blue-50 text-blue-600 font-medium"
+              @click="closeSidebar"
             >
-              <!-- Icon placeholder - Replace with your icons -->
               <span class="text-xl">{{ item.iconPlaceholder }}</span>
               <span class="font-medium">{{ item.name }}</span>
-            </a>
+            </router-link>
           </nav>
         </div>
       </aside>
-    </div>
+    </transition>
   </div>
 </template>
 
 <script lang="ts">
 export default {
   name: 'ComicNavbar',
+
   data() {
     return {
       searchQuery: '',
@@ -323,7 +292,7 @@ export default {
       showThemeMenu: false,
       sidebarOpen: false,
       showMobileSearch: false,
-      themeMode: 'system', // 'light', 'dark', or 'system'
+      themeMode: 'system',
       notificationCount: 2,
       userData: {
         name: 'Admin User',
@@ -350,99 +319,146 @@ export default {
         {
           name: 'E-Commerce',
           iconPlaceholder: '🛒',
-          link: '/ecommerce',
+          link: '/e-commerce',
           active: false
         },
         {
           name: 'Profile',
           iconPlaceholder: '👤',
-          link: '/profile',
+          link: '/admin_profile',
           active: false
         },
         {
           name: 'Settings',
           iconPlaceholder: '⚙️',
-          link: '/settings',
+          link: '/setting',
           active: false
         }
       ]
     }
   },
-  methods: {
-    handleSearch() {
-      console.log('Searching for:', this.searchQuery);
-      this.showMobileSearch = false;
-      // TODO: Implement backend search API call
-    },
-    toggleMobileSearch() {
-      this.showMobileSearch = !this.showMobileSearch;
-    },
-    getThemeIcon() {
-      if (this.themeMode === 'light') return 'pi pi-sun';
-      if (this.themeMode === 'dark') return 'pi pi-moon';
-      return 'pi pi-desktop'; // system
-    },
-    setTheme(mode) {
-      this.themeMode = mode;
-      this.showThemeMenu = false;
-      console.log('Theme mode set to:', mode);
-      // TODO: Implement actual theme switching logic
-      // Example:
-      // if (mode === 'system') {
-      //   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      //   document.documentElement.classList.toggle('dark', prefersDark);
-      // } else {
-      //   document.documentElement.classList.toggle('dark', mode === 'dark');
-      // }
-    },
-    toggleSidebar() {
-      this.sidebarOpen = !this.sidebarOpen;
-    },
-    closeSidebar() {
-      this.sidebarOpen = false;
-    },
-    handleNotificationClick(notification) {
-      console.log('Notification clicked:', notification);
-      this.showNotifications = false;
-      // TODO: Mark notification as read and navigate to relevant page
-    },
-    viewAllNotifications() {
-      this.showNotifications = false;
-      console.log('View all notifications');
-      // TODO: Navigate to notifications page
-    },
-    goToProfile() {
-      this.showUserMenu = false;
-      console.log('Go to profile');
-    },
-    goToMyComics() {
-      this.showUserMenu = false;
-      console.log('Go to my comics');
-    },
-    goToPreferences() {
-      this.showUserMenu = false;
-      console.log('Go to preferences');
-    },
-    handleLogout() {
-      console.log('Logout');
-      // TODO: Implement logout
-    },
-    navigateTo(item) {
-    console.log('Navigating to:', item.name);
-    this.menuItems.forEach(menuItem => {
-      menuItem.active = menuItem.name === item.name;
-    });
-}
 
+  mounted() {
+    document.addEventListener('click', this.handleClickOutside)
+  },
+
+  beforeUnmount() {
+    document.removeEventListener('click', this.handleClickOutside)
+  },
+
+  methods: {
+    handleClickOutside(event) {
+      const target = event.target
+      if (!target.closest('.relative')) {
+        this.showThemeMenu = false
+        this.showNotifications = false
+        this.showUserMenu = false
+      }
+    },
+
+    handleSearch() {
+      console.log('Searching for:', this.searchQuery)
+      this.showMobileSearch = false
+    },
+
+    toggleMobileSearch() {
+      this.showMobileSearch = !this.showMobileSearch
+      this.showThemeMenu = false
+      this.showNotifications = false
+      this.showUserMenu = false
+    },
+
+    toggleThemeMenu() {
+      this.showThemeMenu = !this.showThemeMenu
+      this.showNotifications = false
+      this.showUserMenu = false
+    },
+
+    toggleNotifications() {
+      this.showNotifications = !this.showNotifications
+      this.showThemeMenu = false
+      this.showUserMenu = false
+    },
+
+    toggleUserMenu() {
+      this.showUserMenu = !this.showUserMenu
+      this.showThemeMenu = false
+      this.showNotifications = false
+    },
+
+    getThemeIcon() {
+      if (this.themeMode === 'light') return 'pi pi-sun'
+      if (this.themeMode === 'dark') return 'pi pi-moon'
+      return 'pi pi-desktop'
+    },
+
+    setTheme(mode) {
+      this.themeMode = mode
+      this.showThemeMenu = false
+      console.log('Theme mode set to:', mode)
+    },
+
+    toggleSidebar() {
+      this.sidebarOpen = !this.sidebarOpen
+      if (this.sidebarOpen) {
+        this.showThemeMenu = false
+        this.showNotifications = false
+        this.showUserMenu = false
+      }
+    },
+
+    closeSidebar() {
+      this.sidebarOpen = false
+    },
+
+    handleNotificationClick(notification) {
+      console.log('Notification clicked:', notification)
+      this.showNotifications = false
+    },
+
+    viewAllNotifications() {
+      this.showNotifications = false
+      console.log('View all notifications')
+    },
+
+    goToProfile() {
+      this.showUserMenu = false
+      console.log('Go to profile')
+    },
+
+    goToMyComics() {
+      this.showUserMenu = false
+      console.log('Go to my comics')
+    },
+
+    goToPreferences() {
+      this.showUserMenu = false
+      console.log('Go to preferences')
+    },
+
+    handleLogout() {
+      console.log('Logout')
+    }
   }
 }
 </script>
 
 <style scoped>
-svg {
-  width: 100%;
-  height: auto;
-  max-width: 100%;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease;
+}
+.slide-enter-from,
+.slide-leave-to {
+  transform: translateX(-100%);
+}
 </style>
