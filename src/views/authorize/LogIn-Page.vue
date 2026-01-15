@@ -15,15 +15,20 @@
 
         <!-- FORM -->
         <form class="mt-3 space-y-6" @submit.prevent="onSubmit">
+          <!-- Error Message -->
+          <div v-if="errorMessage" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {{ errorMessage }}
+          </div>
 
           <!-- Email -->
-          <div >
+          <div>
             <label class="text-sm font-medium text-gray-700">Email Address</label>
             <input
               v-model="email"
               type="email"
               placeholder="Enter your email"
-              class="mt-2 w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none"
+              :disabled="isLoginAttemptLocked"
+              class="mt-2 w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -35,7 +40,8 @@
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
               placeholder="Enter your password"
-              class="mt-2 w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none"
+              :disabled="isLoginAttemptLocked"
+              class="mt-2 w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -43,18 +49,24 @@
           <!-- Show pass + forgot -->
           <div class="flex justify-between items-center text-sm">
             <label class="flex items-center text-gray-600">
-              <input type="checkbox" v-model="showPassword" class="mr-2" />
+              <input type="checkbox" v-model="showPassword" :disabled="isLoginAttemptLocked" class="mr-2" />
               Show Password
             </label>
             <a href="#" class="text-indigo-600 hover:underline">Forgot password?</a>
           </div>
 
+          <!-- Lock Warning -->
+          <div v-if="isLoginAttemptLocked" class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm">
+            Too many login attempts. Please try again in {{ lockoutTimeRemaining }} seconds.
+          </div>
+
           <!-- Login button -->
           <button
             type="submit"
-            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg text-lg transition mt-5"
+            :disabled="isLoginAttemptLocked || !email || !password"
+            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg text-lg transition mt-5 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Log In
+            {{ isLoading ? 'Logging in...' : 'Log In' }}
           </button>
 
           <p class="text-center text-sm text-gray-700">
@@ -106,16 +118,162 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import poster1 from '@/assets/poster1.png';
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import poster1 from '@/assets/poster1.png'
 
+const router = useRouter()
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
+const errorMessage = ref('')
+const isLoading = ref(false)
 
-function onSubmit() {
-  alert(`Email: ${email.value}\nPassword: ${password.value}`)
+// Security: Login attempt limiting
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION = 300 // 5 minutes in seconds
+let loginAttempts = 0
+let lockoutTimer: number | null = null
+const isLoginAttemptLocked = ref(false)
+const lockoutTimeRemaining = ref(0)
+
+// Load login attempts from sessionStorage (reset on browser close)
+const loadLoginAttempts = () => {
+  const stored = sessionStorage.getItem('loginAttempts')
+  const storedTime = sessionStorage.getItem('loginAttemptTime')
+
+  if (stored && storedTime) {
+    const timePassed = Math.floor((Date.now() - parseInt(storedTime)) / 1000)
+    if (timePassed < LOCKOUT_DURATION) {
+      loginAttempts = parseInt(stored)
+      if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+        activateLockout(LOCKOUT_DURATION - timePassed)
+      }
+    } else {
+      resetLoginAttempts()
+    }
+  }
 }
+
+const activateLockout = (duration: number) => {
+  isLoginAttemptLocked.value = true
+  lockoutTimeRemaining.value = duration
+
+  lockoutTimer = window.setInterval(() => {
+    lockoutTimeRemaining.value--
+    if (lockoutTimeRemaining.value <= 0) {
+      resetLoginAttempts()
+    }
+  }, 1000)
+}
+
+const recordFailedAttempt = () => {
+  loginAttempts++
+  sessionStorage.setItem('loginAttempts', loginAttempts.toString())
+  sessionStorage.setItem('loginAttemptTime', Date.now().toString())
+
+  if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+    activateLockout(LOCKOUT_DURATION)
+  }
+}
+
+const resetLoginAttempts = () => {
+  loginAttempts = 0
+  isLoginAttemptLocked.value = false
+  lockoutTimeRemaining.value = 0
+  sessionStorage.removeItem('loginAttempts')
+  sessionStorage.removeItem('loginAttemptTime')
+  if (lockoutTimer) {
+    clearInterval(lockoutTimer)
+  }
+}
+
+// Validate password requirements
+const validatePassword = (pwd: string): { valid: boolean; message: string } => {
+  if (pwd.length < 6) {
+    return { valid: false, message: 'Password must be at least 6 characters' }
+  }
+  if (!/[A-Z]/.test(pwd) && !/[0-9]/.test(pwd)) {
+    return {
+      valid: false,
+      message: 'Password must contain at least one uppercase letter or number',
+    }
+  }
+  return { valid: true, message: '' }
+}
+
+// Sanitize input to prevent XSS
+const sanitizeInput = (input: string): string => {
+  return input.trim().replace(/[<>"']/g, '')
+}
+
+const onSubmit = async () => {
+  if (isLoginAttemptLocked.value) {
+    errorMessage.value = 'Too many login attempts. Please try again later.'
+    return
+  }
+
+  errorMessage.value = ''
+  const sanitizedEmail = sanitizeInput(email.value)
+  const sanitizedPassword = sanitizeInput(password.value)
+
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(sanitizedEmail)) {
+    errorMessage.value = 'Please enter a valid email address'
+    recordFailedAttempt()
+    return
+  }
+
+  // Validate password
+  const passwordValidation = validatePassword(sanitizedPassword)
+  if (!passwordValidation.valid) {
+    errorMessage.value = passwordValidation.message
+    recordFailedAttempt()
+    return
+  }
+
+  isLoading.value = true
+
+  try {
+    // Simulate API call - replace with actual backend authentication
+    await new Promise((resolve) => setTimeout(resolve, 1500))
+
+    // Mock validation - replace with real backend
+    if (sanitizedEmail && sanitizedPassword) {
+      // Save auth token (should come from backend)
+      localStorage.setItem('authToken', 'mock-jwt-token-' + Date.now())
+      localStorage.setItem('userEmail', sanitizedEmail)
+
+      // Reset attempts on successful login
+      resetLoginAttempts()
+      errorMessage.value = ''
+
+      // Redirect to home
+      setTimeout(() => {
+        router.push('/')
+      }, 500)
+    } else {
+      errorMessage.value = 'Invalid credentials. Please try again.'
+      recordFailedAttempt()
+    }
+  } catch (error) {
+    errorMessage.value = 'Login failed. Please try again later.'
+    recordFailedAttempt()
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadLoginAttempts()
+})
+
+onUnmounted(() => {
+  if (lockoutTimer) {
+    clearInterval(lockoutTimer)
+  }
+})
 </script>
 
 <style>
