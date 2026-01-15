@@ -268,7 +268,7 @@ const logout = () => {
   localStorage.removeItem('userProfile')
 
   // Redirect to home or login
-  router.push('/')
+  router.push('/LoginPage')
 }
 </script>
 
