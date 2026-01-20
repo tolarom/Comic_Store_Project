@@ -3,7 +3,7 @@
     <div class="max-w-6xl mx-auto">
       <!-- Back to Cart Button -->
       <router-link
-        to="/shopcart"
+        to="/client/cart"
         class="inline-flex items-center gap-2 mb-8 text-blue-600 hover:text-blue-800 font-medium transition"
       >
         <svg class="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,14 +306,8 @@
             </div>
           </div>
 
-          <!-- Action Buttons -->
-          <div class="grid gap-3 sm:grid-cols-2">
-            <button
-              @click="goToRating"
-              class="w-full px-6 py-3 bg-white text-blue-600 border border-blue-600 font-semibold rounded-xl hover:bg-blue-50 transition-all duration-200 shadow-sm"
-            >
-              Leave a Rating
-            </button>
+          <!-- Action Button -->
+          <div>
             <button
               @click="closeModal"
               class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
@@ -332,11 +326,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
-import { useRatingSessionStore } from '@/stores/ratingSession'
 import FooterPage from '@/components/client/FooterPage.vue'
 
 const cartStore = useCartStore()
-const ratingSessionStore = useRatingSessionStore()
 const shippingMethod = ref<'delivery' | 'pickup'>('delivery')
 
 const form = ref({
@@ -419,25 +411,6 @@ const closeModal = () => {
   cartStore.removeSelectedItems()
   setTimeout(() => {
     router.push('/')
-  }, 300)
-}
-
-const goToRating = () => {
-  // Capture purchased items for rating before clearing cart
-  ratingSessionStore.setItems(
-    cartItems.value.map((item) => ({
-      id: item.id,
-      name: item.name,
-      image: item.image,
-      quantity: item.quantity,
-      price: item.price,
-    })),
-  )
-
-  showSuccessModal.value = false
-  cartStore.removeSelectedItems()
-  setTimeout(() => {
-    router.push('/rating')
   }, 300)
 }
 </script>

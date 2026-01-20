@@ -1,6 +1,6 @@
 <template>
   <div class="product-card">
-    <router-link :to="`/productdescription/${product.id}`" class="product-link">
+    <router-link :to="`/client/products/${product.id}`" class="product-link">
       <h2 class="product-title">{{ product.title }}</h2>
       <div class="image-cover">
         <img class="product-image" :src="product.image" :alt="product.title" />

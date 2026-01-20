@@ -15,7 +15,6 @@
       </div>
       <ul class="hidden md:flex gap-6 items-center">
         <li><router-link to="/new" class="hover:text-gray-200">NEW ARRIVALS</router-link></li>
-        <li><router-link to="/best" class="hover:text-gray-200">BEST SELLERS</router-link></li>
         <li class="relative" v-for="(menu, index) in dropdowns" :key="index">
           <button
             @click="toggleDropdown(index)"
@@ -56,13 +55,53 @@
       </ul>
 
       <div class="hidden md:flex gap-4 text-lg">
-        <router-link to="/productpage" class="cursor-pointer">
+        <router-link to="/client/products" class="cursor-pointer">
           <i class="pi pi-search text-2xl"></i>
         </router-link>
-        <router-link to="/profile" class="cursor-pointer">
-          <i class="pi pi-user text-2xl"></i>
-        </router-link>
-        <router-link to="/ShopCart" class="cursor-pointer relative">
+        <div class="relative">
+          <button @click="showProfileMenu = !showProfileMenu" class="cursor-pointer">
+            <i class="pi pi-user text-2xl"></i>
+          </button>
+          <transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0 scale-95 -translate-y-2"
+            enter-to-class="opacity-100 scale-100 translate-y-0"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100 scale-100 translate-y-0"
+            leave-to-class="opacity-0 scale-95 -translate-y-2"
+          >
+            <div
+              v-if="showProfileMenu"
+              class="absolute right-0 mt-[12px] bg-white text-black rounded-lg shadow-xl min-w-[160px] py-2 z-50 border border-gray-100 overflow-hidden"
+            >
+              <router-link
+                to="/client/profile"
+                class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
+                @click="showProfileMenu = false"
+              >
+                <i class="pi pi-user"></i>
+                Profile
+              </router-link>
+              <router-link
+                to="/client/orders"
+                class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
+                @click="showProfileMenu = false"
+              >
+                <i class="pi pi-shopping-bag"></i>
+                My Orders
+              </router-link>
+              <router-link
+                to="/client/settings"
+                class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
+                @click="showProfileMenu = false"
+              >
+                <i class="pi pi-cog"></i>
+                Settings
+              </router-link>
+            </div>
+          </transition>
+        </div>
+        <router-link to="/client/cart" class="cursor-pointer relative">
           <i class="pi pi-shopping-cart text-2xl"></i>
           <span
             v-if="cartStore.totalItems > 0"
@@ -135,6 +174,7 @@ import logo from '@/assets/logo.png'
 
 const cartStore = useCartStore()
 const isMenuOpen = ref(false)
+const showProfileMenu = ref(false)
 
 // Dropdown menus
 const dropdowns = reactive([
@@ -169,14 +209,6 @@ const dropdowns = reactive([
     items: [
       { name: 'Bags', link: '/accessories/bags' },
       { name: 'Hats', link: '/accessories/hats' },
-    ],
-  },
-  {
-    title: 'SHOP BY SERIES',
-    open: false,
-    items: [
-      { name: 'Series 1', link: '/series/1' },
-      { name: 'Series 2', link: '/series/2' },
     ],
   },
 ])

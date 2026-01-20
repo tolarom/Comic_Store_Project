@@ -109,11 +109,11 @@ const submitFeedback = () => {
   console.log('Feedback submitted:', payload)
 
   ratingStore.clear()
-  router.push('/')
+  router.push('/client/orders')
 }
 
 const goHome = () => {
   ratingStore.clear()
-  router.push('/')
+  router.push('/client/orders')
 }
 </script>

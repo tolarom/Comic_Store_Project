@@ -12,35 +12,6 @@
           </div>
         </div>
 
-        <!-- Center Section - Search -->
-        <div class="flex-1 max-w-md mx-4">
-          <!-- Desktop Search Bar -->
-          <div class="relative hidden md:block">
-            <span
-              class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none z-10"
-            >
-              <i class="pi pi-search text-xl"></i>
-            </span>
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="Search..."
-              @keydown.enter="handleSearch"
-              class="w-full pl-10 pr-4 py-2.5 rounded-[10px]
-                    border border-gray-300
-                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                    transition-all duration-200 bg-white"
-            />
-          </div>
-          <!-- Mobile Search Icon -->
-          <button
-            @click="toggleMobileSearch"
-            class="md:hidden text-white hover:bg-white/10 p-2 rounded-lg transition-colors"
-          >
-            <i class="pi pi-search text-xl"></i>
-          </button>
-        </div>
-
         <!-- Right Section - Theme, Notifications, User -->
         <div class="flex items-center gap-1 md:gap-2">
           <!-- Theme Toggle -->
@@ -180,12 +151,11 @@
                 </button>
               </div>
               <div class="border-t py-2">
-                <button
+                <router-link to="/LoginPage"
                   class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                  @click="handleLogout"
                 >
                   Logout
-                </button>
+                </router-link>
               </div>
             </div>
           </div>
@@ -204,33 +174,6 @@
         </div>
       </div>
     </nav>
-
-    <!-- Mobile Search Overlay -->
-    <transition name="fade">
-      <div
-        v-if="showMobileSearch"
-        class="md:hidden fixed top-14 left-0 right-0 bg-white shadow-lg z-40 p-4"
-      >
-        <div class="relative">
-          <span
-            class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
-          >
-            <i class="pi pi-search text-xl"></i>
-          </span>
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search..."
-            @keydown.enter="handleSearch"
-            class="w-full pl-10 pr-4 py-2.5 rounded-[10px]
-                  border border-gray-300
-                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-                  transition-all duration-200"
-            autofocus
-          />
-        </div>
-      </div>
-    </transition>
 
     <!-- Sidebar - Always Open (No Overlay) -->
     <aside
@@ -260,12 +203,10 @@ export default {
 
   data() {
     return {
-      searchQuery: '',
       showNotifications: false,
       showUserMenu: false,
       showThemeMenu: false,
       sidebarOpen: true, // Changed to true to keep sidebar open by default
-      showMobileSearch: false,
       themeMode: 'system',
       notificationCount: 2,
       userData: {
@@ -286,22 +227,32 @@ export default {
         {
           name: 'Analytics',
           iconPlaceholder: '📈',
-          link: '/analytics'
+          link: '/admin/analytics'
         },
         {
           name: 'E-Commerce',
           iconPlaceholder: '🛒',
-          link: '/e-commerce'
+          link: '/admin/e-commerce'
+        },
+        {
+          name: 'Orders',
+          iconPlaceholder: '📦',
+          link: '/admin/orders'
+        },
+        {
+          name: 'User Control',
+          iconPlaceholder: '👥',
+          link: '/admin/users'
         },
         {
           name: 'Profile',
           iconPlaceholder: '👤',
-          link: '/admin_profile'
+          link: '/admin/profile'
         },
         {
           name: 'Settings',
           iconPlaceholder: '⚙️',
-          link: '/setting'
+          link: '/admin/setting'
         }
       ]
     }
@@ -323,18 +274,6 @@ export default {
         this.showNotifications = false
         this.showUserMenu = false
       }
-    },
-
-    handleSearch() {
-      console.log('Searching for:', this.searchQuery)
-      this.showMobileSearch = false
-    },
-
-    toggleMobileSearch() {
-      this.showMobileSearch = !this.showMobileSearch
-      this.showThemeMenu = false
-      this.showNotifications = false
-      this.showUserMenu = false
     },
 
     toggleThemeMenu() {

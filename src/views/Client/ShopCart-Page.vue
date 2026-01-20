@@ -31,7 +31,7 @@
         <!-- Empty Cart -->
         <div v-else class="text-center py-12 text-gray-500">
           <p class="text-xl">Your cart is empty</p>
-          <router-link to="/shop" class="text-indigo-600 hover:underline mt-4 inline-block">
+          <router-link to="/client/shop" class="text-indigo-600 hover:underline mt-4 inline-block">
             Continue Shopping →
           </router-link>
         </div>
@@ -61,7 +61,7 @@
         <!-- Checkout Button -->
         <router-link
           v-if="products.length > 0"
-          to="/checkout"
+          to="/client/checkout"
           class="block w-full mt-8 bg-indigo-600 text-white text-center py-3 rounded-lg font-semibold hover:bg-indigo-700 transition shadow-md"
         >
           Proceed to Checkout
@@ -69,7 +69,7 @@
 
         <!-- Continue Shopping -->
         <router-link
-          to="/shop"
+          to="/client/shop"
           class="mt-4 flex items-center justify-center text-indigo-600 hover:underline font-medium"
         >
           <svg

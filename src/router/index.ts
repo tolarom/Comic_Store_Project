@@ -9,11 +9,15 @@ import Homeview from '@/views/Client/Homeview-Page.vue'
 import ProductPage from '@/views/Client/product-page.vue'
 import ProductDetail from '@/views/Client/Product-detail.vue'
 import RatingPage from '@/views/Client/Rating-Page.vue'
+import ClientSettings from '@/views/Client/Settings-Page.vue'
+import PurchaseHistory from '@/views/Client/PurchaseHistory.vue'
 import Analytics from '@/views/Admin/Analytics.vue'
 import AdminDashboard from '@/views/Admin/Dashboard.vue'
 import ECommerce from '@/views/Admin/E-Commerce.vue'
 import Admin_profile from '@/views/Admin/Admin_profile.vue'
 import Setting from '@/views/Admin/Setting.vue'
+import UserControl from '@/views/Admin/UserControl.vue'
+import OrderHistory from '@/views/Admin/OrderHistory.vue'
 
 const routes = [
   // Authentication routes (public)
@@ -37,7 +41,7 @@ const routes = [
     component: Homeview,
   },
   {
-    path: '/shop',
+    path: '/client/shop',
     name: 'Shop',
     component: Homeview,
   },
@@ -45,13 +49,13 @@ const routes = [
 
   // Product routes
   {
-    path: '/productpage',
+    path: '/client/products',
     name: 'ProductPage',
     component: ProductPage,
     meta: { title: 'Shop' },
   },
   {
-    path: '/productdescription/:id',
+    path: '/client/products/:id',
     name: 'ProductDetail',
     component: ProductDetail,
     meta: { title: 'Product Details' },
@@ -59,28 +63,40 @@ const routes = [
 
   
   {
-    path: '/shopcart',
+    path: '/client/cart',
     name: 'ShopCart',
     component: ShopCart,
     meta: { title: 'Shopping Cart' },
   },
   {
-    path: '/checkout',
+    path: '/client/checkout',
     name: 'CheckOut',
     component: Checkout,
     meta: { title: 'Checkout' },
   },
   {
-    path: '/profile',
+    path: '/client/profile',
     name: 'Profile',
     component: Profile,
     meta: { title: 'My Profile' },
   },
   {
-    path: '/rating',
+    path: '/client/rating',
     name: 'Rating',
     component: RatingPage,
     meta: { title: 'Leave a Rating' },
+  },
+  {
+    path: '/client/settings',
+    name: 'ClientSettings',
+    component: ClientSettings,
+    meta: { title: 'Account Settings' },
+  },
+  {
+    path: '/client/orders',
+    name: 'PurchaseHistory',
+    component: PurchaseHistory,
+    meta: { title: 'Purchase History' },
   },
 
   // Admin routes
@@ -94,24 +110,34 @@ const routes = [
     component: AdminDashboard,
   },
   {
-    path: '/analytics',
+    path: '/admin/analytics',
     name: 'Analytics',
     component: Analytics,
   },
   {
-    path: '/e-commerce',
+    path: '/admin/e-commerce',
     name: 'ECommerce',
     component: ECommerce,
   },
   {
-    path: '/admin_profile',
+    path: '/admin/profile',
     name: 'AdminProfile',
     component: Admin_profile,
   },
   {
-    path: '/setting',
+    path: '/admin/setting',
     name: 'Setting',
     component: Setting,
+  },
+  {
+    path: '/admin/users',
+    name: 'UserControl',
+    component: UserControl,
+  },
+  {
+    path: '/admin/orders',
+    name: 'OrderHistory',
+    component: OrderHistory,
   },
 
   // Catch-all route for 404 - MUST BE LAST
@@ -144,7 +170,7 @@ router.beforeEach((to, from, next) => {
     to.meta.requiresAuth !== false &&
     !isAuthenticated &&
     to.path !== '/' &&
-    to.path !== '/shop'
+    to.path !== '/client/shop'
   ) {
     // Allow public routes
     if (to.path !== '/loginPage' && to.path !== '/signUpPage') {

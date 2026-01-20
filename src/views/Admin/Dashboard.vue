@@ -1,6 +1,6 @@
 <template>
   <div>
-    <Header/>
+    <AdminNav/>
     <div class="p-6 bg-gray-100 min-h-screen pt-6 ml-[250px] mt-10">
 
       <!-- Breadcrumb -->
@@ -224,11 +224,6 @@
               </div>
               <div class="text-right">
                 <p class="font-semibold text-gray-800">${{ formatNumber(product.revenue) }}</p>
-                <span :class="product.change >= 0 ? 'text-green-600' : 'text-red-600'"
-                      class="text-xs flex items-center justify-end">
-                  <i :class="product.change >= 0 ? 'pi pi-arrow-up' : 'pi pi-arrow-down'" class="mr-1 text-xs"></i>
-                  {{ Math.abs(product.change) }}%
-                </span>
               </div>
             </div>
           </div>
@@ -240,12 +235,12 @@
   </div>
 </template>
 
-<script>
-import Header from '../../components/Admin/NavigationBar.vue';
+<script lang="ts">
+import AdminNav from '../../components/Admin/NavigationBar.vue';
 export default {
-  name: 'Dashboard',
+  name: 'AdminDashboard',
   components: {
-    Header,
+    AdminNav,
   },
   data() {
     return {

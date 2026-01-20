@@ -1,17 +1,21 @@
 <template>
   <NavigationBar />
   <Slider />
-  <div class="products-section">
+  <!-- Category Sections -->
+  <div v-for="cat in categories" :key="cat" class="products-section">
     <div class="section-header">
-      <h2 class="section-title">Featured Products</h2>
-      <router-link to="/productpage" class="see-more-btn">
+      <h2 class="section-title">{{ formatCategory(cat) }}</h2>
+      <router-link
+        :to="{ path: '/client/products', query: { category: cat } }"
+        class="see-more-btn"
+      >
         See More
         <i class="pi pi-arrow-right"></i>
       </router-link>
     </div>
     <div class="products-grid">
       <ProductCard
-        v-for="product in products.slice(0, 4)"
+        v-for="product in getProductsByCategory(cat).slice(0, 4)"
         :key="product.id"
         :product="product"
         @add-to-cart="addToCart"
@@ -34,6 +38,32 @@ const cartStore = useCartStore()
 const productsStore = useProductsStore()
 
 const products = computed(() => productsStore.products)
+
+// Unique categories from products
+const categories = computed(() => {
+  const set = new Set<string>()
+  products.value.forEach((p: any) => {
+    if (p.category) set.add(p.category)
+  })
+  // Provide stable ordering if desired
+  const order = ['comics', 'manga', 'graphic-novels', 'merchandise']
+  const byOrder = Array.from(set).sort((a, b) => order.indexOf(a) - order.indexOf(b))
+  return byOrder.length ? byOrder : Array.from(set)
+})
+
+// Helper to filter products by category
+const getProductsByCategory = (category: string) => {
+  return products.value.filter((p: any) => p.category === category)
+}
+
+// Display-friendly category label
+const formatCategory = (cat: string) => {
+  if (!cat) return 'Category'
+  return cat
+    .split('-')
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(' ')
+}
 
 const addToCart = (product: any) => {
   const discountedPrice = product.discount

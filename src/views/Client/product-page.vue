@@ -9,15 +9,33 @@
         <p class="text-sm text-gray-600">{{ productCountDisplay }}</p>
       </div>
 
-      <div class="sort-by">
-        <label class="text-sm mr-2">SORT BY:</label>
-        <select class="border border-gray-400 rounded px-3 py-1 text-sm" v-model="sortOption">
-          <option value="default">default</option>
-          <option value="price-low">Price: Low to High</option>
-          <option value="price-high">Price: High to Low</option>
-          <option value="alpha-asc">Alphabet: A to Z</option>
-          <option value="alpha-desc">Alphabet: Z to A</option>
-        </select>
+      <div class="flex gap-4 items-center">
+        <!-- Category Filter -->
+        <div class="category-filter">
+          <label class="text-sm mr-2">CATEGORY:</label>
+          <select
+            class="border border-gray-400 rounded px-3 py-1 text-sm"
+            v-model="selectedCategory"
+          >
+            <option value="all">All Categories</option>
+            <option value="comics">Comics</option>
+            <option value="manga">Manga</option>
+            <option value="graphic-novels">Graphic Novels</option>
+            <option value="merchandise">Merchandise</option>
+          </select>
+        </div>
+
+        <!-- Sort By -->
+        <div class="sort-by">
+          <label class="text-sm mr-2">SORT BY:</label>
+          <select class="border border-gray-400 rounded px-3 py-1 text-sm" v-model="sortOption">
+            <option value="default">default</option>
+            <option value="price-low">Price: Low to High</option>
+            <option value="price-high">Price: High to Low</option>
+            <option value="alpha-asc">Alphabet: A to Z</option>
+            <option value="alpha-desc">Alphabet: Z to A</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
@@ -77,33 +95,76 @@
 import SearchBar from '@/components/client/SearchBar.vue'
 import ProductCard from '@/components/client/product-card.vue'
 import FooterPage from '@/components/client/FooterPage.vue'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useProductsStore, type ProductItem } from '@/data/products'
 import { useCartStore } from '@/stores/cart'
 import { useSearch } from '@/composables/useSearch'
+import { useRoute, useRouter } from 'vue-router'
 
 const cartStore = useCartStore()
 const { searchQuery } = useSearch()
 
 const productsStore = useProductsStore()
 const products = computed(() => productsStore.products)
+const route = useRoute()
+const router = useRouter()
 
 const productQuantity = computed(() => products.value.length)
 
-const sortOption = ref<'default' | 'price-low' | 'price-high' | 'alpha-asc' | 'alpha-desc'>('default')
+const sortOption = ref<'default' | 'price-low' | 'price-high' | 'alpha-asc' | 'alpha-desc'>(
+  'default',
+)
+const selectedCategory = ref<string>('all')
 
 // Pagination
 const currentPage = ref(1)
 const itemsPerPage = 12
 
-// Reset page when search query changes
-watch(searchQuery, () => {
+// Reset page when search query or category changes
+watch([searchQuery, selectedCategory], () => {
   currentPage.value = 1
 })
+
+// Initialize category from query param (e.g., /client/products?category=manga)
+onMounted(() => {
+  const cat = route.query.category
+  if (typeof cat === 'string' && cat.trim().length > 0) {
+    selectedCategory.value = cat.toLowerCase()
+  }
+})
+
+// Keep URL in sync when user changes category via dropdown
+watch(selectedCategory, (cat) => {
+  const newQuery: Record<string, any> = { ...route.query }
+  if (cat === 'all') {
+    delete newQuery.category
+  } else {
+    newQuery.category = cat
+  }
+  router.replace({ query: newQuery })
+})
+
+// Reflect external route changes (e.g., back/forward navigation)
+watch(
+  () => route.query.category,
+  (cat) => {
+    const normalized = typeof cat === 'string' ? cat.toLowerCase() : 'all'
+    if (normalized !== selectedCategory.value) {
+      selectedCategory.value = normalized
+    }
+  }
+)
 
 const sortedProducts = computed<ProductItem[]>(() => {
   let productsCopy = [...products.value]
 
+  if (selectedCategory.value !== 'all') {
+    productsCopy = productsCopy.filter(
+      (product) => product.category?.toLowerCase() === selectedCategory.value,
+    )
+  }
+
+  // Filter by
   // Filter by search query
   if (searchQuery.value && searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
@@ -135,7 +196,7 @@ const totalPages = computed(() => Math.ceil(sortedProducts.value.length / itemsP
 const productCountDisplay = computed(() => {
   const filtered = sortedProducts.value.length
   const total = productQuantity.value
-  
+
   if (searchQuery.value && searchQuery.value.trim()) {
     return `Showing ${filtered} of ${total} products (filtered)`
   }

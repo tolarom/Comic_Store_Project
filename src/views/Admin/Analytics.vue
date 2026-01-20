@@ -7,7 +7,7 @@
         <div class="flex items-center text-sm text-gray-600 mb-2">
           <i class="pi pi-home"></i>
           <span class="mx-2">/</span>
-          <span>Dashboard</span>
+          <span>Analytics</span>
         </div>
         <h1 class="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
         <p class="text-gray-600 mt-1">Detailed analytics and insights for your business performance.</p>
@@ -20,8 +20,6 @@
           :key="key"
           :title="metric.title"
           :value="metric.value"
-          :change="metric.change"
-          :trend="metric.trend"
           :icon="metric.icon"
         />
       </div>
@@ -152,6 +150,7 @@
 import { ref, onMounted, onBeforeUnmount, defineComponent } from 'vue';
 import Chart from 'chart.js/auto';
 import Header from '../../components/Admin/NavigationBar.vue';
+import { useUsersStore } from '../../data/users';
 
 // MetricCard Component
 const MetricCard = defineComponent({
@@ -159,8 +158,6 @@ const MetricCard = defineComponent({
   props: {
     title: String,
     value: [String, Number],
-    change: Number,
-    trend: String,
     icon: String
   },
   template: `
@@ -169,11 +166,7 @@ const MetricCard = defineComponent({
         <div class="text-sm text-gray-600">{{ title }}</div>
         <i :class="icon" class="text-green-500 text-3xl"></i>
       </div>
-      <div class="text-3xl font-bold mb-2">{{ value }}</div>
-      <div :class="['text-sm flex items-center', trend === 'up' ? 'text-green-600' : 'text-red-600']">
-        <i :class="trend === 'up' ? 'pi pi-arrow-up' : 'pi pi-arrow-down'" class="mr-1"></i>
-        {{ trend === 'up' ? '↑' : '↓' }} {{ Math.abs(change) }}% vs last month
-      </div>
+      <div class="text-3xl font-bold">{{ value }}</div>
     </div>
   `
 });
@@ -185,6 +178,7 @@ export default {
      Header,
   },
   setup() {
+    const usersStore = useUsersStore();
     const userGrowthChart = ref(null);
     const pageViewsChart = ref(null);
     const trafficSourcesChart = ref(null);
@@ -193,12 +187,14 @@ export default {
     let pageViewsChartInstance = null;
     let trafficSourcesChartInstance = null;
 
+    const totalUsersCount = usersStore.users.length;
+
     const dashboardData = ref({
       metrics: {
-        totalUsers: { title: 'Total Users', value: 282, change: 18.86, trend: 'up', icon: 'pi pi-users' },
-        pageViews: { title: 'Page Views', value: 482, change: 12, trend: 'up', icon: 'pi pi-eye' },
-        avgSession: { title: 'Avg Session', value: 2.34, change: -12, trend: 'down', icon: 'pi pi-clock' },
-        bounceRate: { title: 'Bounce Rate', value: 3, change: -18, trend: 'down', icon: 'pi pi-chart-line' }
+        totalUsers: { title: 'Total Users', value: totalUsersCount, icon: 'pi pi-users' },
+        pageViews: { title: 'Page Views', value: 482, icon: 'pi pi-eye' },
+        avgSession: { title: 'Avg Session', value: 2.34, icon: 'pi pi-clock' },
+        bounceRate: { title: 'Bounce Rate', value: 3, icon: 'pi pi-chart-line' }
       },
       userGrowth: [
         { month: 'M1', newUsers: 45, returningUsers: 30 },

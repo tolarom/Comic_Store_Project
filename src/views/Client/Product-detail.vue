@@ -41,6 +41,10 @@
         <!-- Rating -->
         <div class="flex items-center gap-3 mt-4">
           <StarRating :rating="product.rating" :read-only="true" :increment="0.1" :star-size="25" />
+          <span class="text-lg font-semibold text-gray-700">{{ product.rating.toFixed(1) }}</span>
+          <span v-if="product.reviewCount" class="text-gray-500"
+            >({{ product.reviewCount }} reviews)</span
+          >
         </div>
 
         <!-- Price -->
@@ -54,17 +58,7 @@
         <hr class="my-8 border-gray-300" />
 
         <!-- Description -->
-        <ul class="space-y-2 text-sm text-gray-600 list-disc pl-5">
-          <li>Pigment printed David and Lucy on the front</li>
-          <li>Printed logo on the front chest</li>
-          <li>HD ink-printed icon on the front</li>
-          <li>HD ink-printed letters on the back</li>
-          <li>Embroidered Atsuko logo on the sleeve</li>
-          <li>Fleece: 60% Cotton, 40% Polyester</li>
-          <li>Ribbed banded cuffs, neck, and waist</li>
-          <li>Imported</li>
-          <li>Officially licensed Cyberpunk: Edgerunners merchandise</li>
-        </ul>
+        <p class="text-gray-600 text-base leading-relaxed">{{ product.description }}</p>
 
         <!-- Quantity Selector -->
         <div class="mt-8 flex items-center gap-6">

@@ -1,7 +1,7 @@
 <template>
   <div><Header /></div>
   <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
-    <div class="w-full">
+    <div class="mx-auto">
       <!-- Breadcrumb -->
       <div class="flex items-center text-sm text-gray-600 mb-4">
         <i class="pi pi-home text-gray-400"></i>
@@ -12,263 +12,196 @@
       <!-- Header -->
       <div class="mb-6">
         <h1 class="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
-        <p class="text-gray-600">Manage your account settings and preferences.</p>
+        <p class="text-gray-600">Manage your account profile, password, and preferences.</p>
       </div>
 
-      <!-- Settings Card -->
-      <div class="bg-white rounded-lg shadow-sm p-8">
-        <!-- Section Header -->
-        <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-          <h2 class="text-xl font-bold text-gray-900">Profile Information</h2>
-          <button class="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors">
-            Public
-          </button>
-        </div>
-
-        <!-- Profile Photo -->
-        <div class="mb-8">
-          <label class="block text-sm font-medium text-gray-700 mb-3">
-            Profile Photo
-          </label>
-          <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl font-bold">
-              {{ getInitials(settingsData.firstName, settingsData.lastName) }}
+      <div class="grid gap-6 lg:grid-cols-3">
+        <!-- Left column: password -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Change Password Card -->
+          <div class="bg-white rounded-lg shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Security</p>
+                <h2 class="text-xl font-bold text-gray-900">Change Password</h2>
+              </div>
             </div>
-            <div class="flex gap-3">
+
+            <div class="space-y-5">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
+                <input
+                  v-model="passwordForm.current"
+                  type="password"
+                  placeholder="Enter current password"
+                  class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                  <input
+                    v-model="passwordForm.newPassword"
+                    type="password"
+                    placeholder="Enter new password"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2"
+                    >Confirm New Password</label
+                  >
+                  <input
+                    v-model="passwordForm.confirm"
+                    type="password"
+                    placeholder="Re-enter new password"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
               <button
-                @click="triggerPhotoUpload"
-                class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                @click="resetPasswordForm"
+                class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <i class="pi pi-camera"></i>
-                Change Photo
+                Clear
               </button>
               <button
-                @click="removePhoto"
-                class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                @click="updatePassword"
+                class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
-                <i class="pi pi-trash"></i>
-                Remove
+                Update Password
               </button>
             </div>
-            <input
-              ref="photoInput"
-              @change="handlePhotoUpload"
-              type="file"
-              accept="image/*"
-              class="hidden"
-            />
           </div>
         </div>
 
-        <!-- Name Fields -->
-        <div class="grid grid-cols-2 gap-6 mb-6">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              First Name
-            </label>
-            <input
-              v-model="settingsData.firstName"
-              type="text"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Last Name
-            </label>
-            <input
-              v-model="settingsData.lastName"
-              type="text"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <!-- Email Field -->
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Email Address
-          </label>
-          <input
-            v-model="settingsData.email"
-            type="email"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p class="text-xs text-gray-500 mt-2">Your email is private.</p>
-        </div>
-
-        <!-- Username Field -->
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Username
-          </label>
-          <input
-            v-model="settingsData.username"
-            type="text"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <p class="text-xs text-gray-500 mt-2">This will be your public username.</p>
-        </div>
-
-        <!-- Bio Field -->
-        <div class="mb-6">
-          <label class="block text-sm font-medium text-gray-700 mb-2">
-            Bio
-          </label>
-          <textarea
-            v-model="settingsData.bio"
-            rows="4"
-            maxlength="180"
-            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          ></textarea>
-          <p class="text-xs text-gray-500 mt-2">
-            Brief description for your profile. Max 180 characters.
-          </p>
-        </div>
-
-        <!-- Website and Location -->
-        <div class="grid grid-cols-2 gap-6 mb-8">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Website
-            </label>
-            <input
-              v-model="settingsData.website"
-              type="url"
-              placeholder="https://johndoe.com"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Location
-            </label>
-            <input
-              v-model="settingsData.location"
-              type="text"
-              placeholder="San Francisco, CA"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="flex justify-end gap-3 pt-6 border-t border-gray-200">
-          <button
-            @click="cancelChanges"
-            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            @click="saveChanges"
-            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            Save Changes
-          </button>
-        </div>
-      </div>
-
-      <!-- Account Settings Section -->
-      <div class="bg-white rounded-lg shadow-sm p-8 mt-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-6">Account Settings</h2>
-
-        <!-- Email Preferences -->
-        <div class="space-y-4">
-          <div class="flex items-center justify-between py-4 border-b border-gray-100">
-            <div>
-              <h3 class="font-semibold text-gray-900">Email Notifications</h3>
-              <p class="text-sm text-gray-600">Receive email updates about your account activity</p>
+        <!-- Right column: account settings + danger -->
+        <div class="space-y-6">
+          <!-- Account Settings -->
+          <div class="bg-white rounded-lg shadow-sm p-8">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-gray-500">Preferences</p>
+                <h2 class="text-xl font-bold text-gray-900">Account Settings</h2>
+              </div>
             </div>
-            <button
-              @click="toggleSetting('emailNotifications')"
-              :class="[
-                'relative w-14 h-7 rounded-full transition-colors',
-                accountSettings.emailNotifications ? 'bg-blue-600' : 'bg-gray-300'
-              ]"
-            >
-              <span
-                :class="[
-                  'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                  accountSettings.emailNotifications ? 'right-0.5' : 'left-0.5'
-                ]"
-              ></span>
-            </button>
+
+            <div class="space-y-4">
+              <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                <div>
+                  <h3 class="font-semibold text-gray-900">Email Notifications</h3>
+                  <p class="text-sm text-gray-600">Updates about activity on your account</p>
+                </div>
+                <button
+                  @click="toggleSetting('emailNotifications')"
+                  :class="[
+                    'relative w-14 h-7 rounded-full transition-colors',
+                    accountSettings.emailNotifications ? 'bg-blue-600' : 'bg-gray-300',
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
+                      accountSettings.emailNotifications ? 'right-0.5' : 'left-0.5',
+                    ]"
+                  ></span>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                <div>
+                  <h3 class="font-semibold text-gray-900">Marketing Emails</h3>
+                  <p class="text-sm text-gray-600">Product news and feature updates</p>
+                </div>
+                <button
+                  @click="toggleSetting('marketingEmails')"
+                  :class="[
+                    'relative w-14 h-7 rounded-full transition-colors',
+                    accountSettings.marketingEmails ? 'bg-blue-600' : 'bg-gray-300',
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
+                      accountSettings.marketingEmails ? 'right-0.5' : 'left-0.5',
+                    ]"
+                  ></span>
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between py-3">
+                <div>
+                  <h3 class="font-semibold text-gray-900">Two-Factor Authentication</h3>
+                  <p class="text-sm text-gray-600">Add an extra layer of security</p>
+                </div>
+                <button
+                  @click="toggleSetting('twoFactorAuth')"
+                  :class="[
+                    'relative w-14 h-7 rounded-full transition-colors',
+                    accountSettings.twoFactorAuth ? 'bg-blue-600' : 'bg-gray-300',
+                  ]"
+                >
+                  <span
+                    :class="[
+                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
+                      accountSettings.twoFactorAuth ? 'right-0.5' : 'left-0.5',
+                    ]"
+                  ></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Logout Button -->
+            <div class="mt-6 pt-6 border-t border-gray-200">
+              <button
+                @click="handleLogout"
+                class="w-full px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
+              >
+                <i class="pi pi-sign-out"></i>
+                Logout
+              </button>
+            </div>
           </div>
 
-          <div class="flex items-center justify-between py-4 border-b border-gray-100">
-            <div>
-              <h3 class="font-semibold text-gray-900">Marketing Emails</h3>
-              <p class="text-sm text-gray-600">Receive emails about new features and updates</p>
+          <!-- Danger Zone -->
+          <div class="bg-white rounded-lg shadow-sm p-8 border border-red-200">
+            <div class="flex items-center justify-between mb-6 pb-4 border-b border-red-100">
+              <div>
+                <p class="text-xs uppercase tracking-wide text-red-500">Danger</p>
+                <h2 class="text-xl font-bold text-red-600">Danger Zone</h2>
+              </div>
             </div>
-            <button
-              @click="toggleSetting('marketingEmails')"
-              :class="[
-                'relative w-14 h-7 rounded-full transition-colors',
-                accountSettings.marketingEmails ? 'bg-blue-600' : 'bg-gray-300'
-              ]"
-            >
-              <span
-                :class="[
-                  'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                  accountSettings.marketingEmails ? 'right-0.5' : 'left-0.5'
-                ]"
-              ></span>
-            </button>
-          </div>
 
-          <div class="flex items-center justify-between py-4">
-            <div>
-              <h3 class="font-semibold text-gray-900">Two-Factor Authentication</h3>
-              <p class="text-sm text-gray-600">Add an extra layer of security to your account</p>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                <div>
+                  <h3 class="font-semibold text-gray-900">Deactivate Account</h3>
+                  <p class="text-sm text-gray-600">Temporarily disable your account</p>
+                </div>
+                <button
+                  @click="deactivateAccount"
+                  class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  Deactivate
+                </button>
+              </div>
+
+              <div class="flex items-center justify-between py-3">
+                <div>
+                  <h3 class="font-semibold text-gray-900">Delete Account</h3>
+                  <p class="text-sm text-gray-600">Permanently delete your account and data</p>
+                </div>
+                <button
+                  @click="deleteAccount"
+                  class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  Delete Account
+                </button>
+              </div>
             </div>
-            <button
-              @click="toggleSetting('twoFactorAuth')"
-              :class="[
-                'relative w-14 h-7 rounded-full transition-colors',
-                accountSettings.twoFactorAuth ? 'bg-blue-600' : 'bg-gray-300'
-              ]"
-            >
-              <span
-                :class="[
-                  'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                  accountSettings.twoFactorAuth ? 'right-0.5' : 'left-0.5'
-                ]"
-              ></span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Danger Zone -->
-      <div class="bg-white rounded-lg shadow-sm p-8 mt-6 border border-red-200">
-        <h2 class="text-xl font-bold text-red-600 mb-6">Danger Zone</h2>
-
-        <div class="space-y-4">
-          <div class="flex items-center justify-between py-4 border-b border-gray-100">
-            <div>
-              <h3 class="font-semibold text-gray-900">Deactivate Account</h3>
-              <p class="text-sm text-gray-600">Temporarily disable your account</p>
-            </div>
-            <button
-              @click="deactivateAccount"
-              class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              Deactivate
-            </button>
-          </div>
-
-          <div class="flex items-center justify-between py-4">
-            <div>
-              <h3 class="font-semibold text-gray-900">Delete Account</h3>
-              <p class="text-sm text-gray-600">Permanently delete your account and all data</p>
-            </div>
-            <button
-              @click="deleteAccount"
-              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-            >
-              Delete Account
-            </button>
           </div>
         </div>
       </div>
@@ -277,120 +210,101 @@
 </template>
 
 <script>
-import { ref } from 'vue';
-import Header from '../../components/Admin/NavigationBar.vue';
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import Header from '../../components/Admin/NavigationBar.vue'
 
 export default {
   name: 'SettingsPage',
-    components: {
+  components: {
     Header,
   },
   setup() {
-    const photoInput = ref(null);
-    const originalSettings = ref(null);
-
-    const settingsData = ref({
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      username: 'johndoe',
-      bio: 'Product designer and developer',
-      website: 'https://johndoe.com',
-      location: 'San Francisco, CA',
-      profilePhoto: null
-    });
-
+    const router = useRouter()
+    
     const accountSettings = ref({
       emailNotifications: true,
       marketingEmails: true,
-      twoFactorAuth: false
-    });
+      twoFactorAuth: false,
+    })
 
-    // Store original settings for cancel functionality
-    originalSettings.value = JSON.parse(JSON.stringify(settingsData.value));
-
-    const getInitials = (firstName, lastName) => {
-      return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-    };
-
-    const triggerPhotoUpload = () => {
-      photoInput.value.click();
-    };
-
-    const handlePhotoUpload = (event) => {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        alert('Please select a valid image file (JPG, PNG, GIF, or WebP)');
-        return;
-      }
-
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        settingsData.value.profilePhoto = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    };
-
-    const removePhoto = () => {
-      if (confirm('Are you sure you want to remove your profile photo?')) {
-        settingsData.value.profilePhoto = null;
-      }
-    };
+    const passwordForm = ref({
+      current: '',
+      newPassword: '',
+      confirm: '',
+    })
 
     const toggleSetting = (setting) => {
-      accountSettings.value[setting] = !accountSettings.value[setting];
-    };
+      accountSettings.value[setting] = !accountSettings.value[setting]
+    }
 
-    const saveChanges = () => {
-      // API call to save settings
-      console.log('Saving settings:', settingsData.value);
-      alert('Settings saved successfully!');
-      originalSettings.value = JSON.parse(JSON.stringify(settingsData.value));
-    };
+    const handleLogout = () => {
+      if (confirm('Are you sure you want to logout?')) {
+        // Clear authentication data
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('user')
+        localStorage.removeItem('userRole')
+        
+        // Redirect to login page
+        router.push('/loginPage')
+      }
+    }
 
-    const cancelChanges = () => {
-      settingsData.value = JSON.parse(JSON.stringify(originalSettings.value));
-    };
+    const resetPasswordForm = () => {
+      passwordForm.value = { current: '', newPassword: '', confirm: '' }
+    }
+
+    const updatePassword = () => {
+      if (
+        !passwordForm.value.current ||
+        !passwordForm.value.newPassword ||
+        !passwordForm.value.confirm
+      ) {
+        alert('Please fill in all password fields')
+        return
+      }
+      if (passwordForm.value.newPassword !== passwordForm.value.confirm) {
+        alert('New passwords do not match')
+        return
+      }
+
+      // API call to update password
+      console.log('Updating password')
+      alert('Password updated successfully')
+      resetPasswordForm()
+    }
 
     const deactivateAccount = () => {
-      if (confirm('Are you sure you want to deactivate your account? You can reactivate it anytime by logging in.')) {
-        console.log('Deactivating account...');
-        alert('Account deactivated');
+      if (
+        confirm(
+          'Are you sure you want to deactivate your account? You can reactivate it anytime by logging in.',
+        )
+      ) {
+        console.log('Deactivating account...')
+        alert('Account deactivated')
       }
-    };
+    }
 
     const deleteAccount = () => {
-      const confirmation = prompt('This action cannot be undone. Type "DELETE" to confirm:');
+      const confirmation = prompt('This action cannot be undone. Type "DELETE" to confirm:')
       if (confirmation === 'DELETE') {
-        console.log('Deleting account...');
-        alert('Account deletion initiated');
+        console.log('Deleting account...')
+        alert('Account deletion initiated')
       }
-    };
+    }
 
     return {
-      photoInput,
-      settingsData,
       accountSettings,
-      getInitials,
-      triggerPhotoUpload,
-      handlePhotoUpload,
-      removePhoto,
+      passwordForm,
       toggleSetting,
-      saveChanges,
-      cancelChanges,
+      handleLogout,
+      resetPasswordForm,
+      updatePassword,
       deactivateAccount,
-      deleteAccount
-    };
-  }
-};
+      deleteAccount,
+    }
+  },
+}
 </script>
 
 <style scoped>
