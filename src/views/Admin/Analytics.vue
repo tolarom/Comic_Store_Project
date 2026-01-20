@@ -34,17 +34,6 @@
           </div>
         </div>
 
-        <!-- Page Views Chart -->
-        <div class="bg-white rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold mb-4">Page Views (Last 7 Days)</h3>
-          <div style="height: 300px; position: relative;">
-            <canvas ref="pageViewsChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts Row 2 -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <!-- Traffic Sources -->
         <div class="bg-white rounded-lg p-6 shadow-sm">
           <h3 class="text-lg font-semibold mb-4">Traffic Sources</h3>
@@ -66,77 +55,6 @@
                   <span class="text-sm text-gray-700">{{ source.name }}</span>
                 </div>
                 <span class="text-sm font-semibold">{{ source.value.toLocaleString() }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Conversion Funnel -->
-        <div class="bg-white rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold mb-4">Conversion Funnel</h3>
-          <div class="space-y-4">
-            <div v-for="(stage, index) in dashboardData.conversionFunnel" :key="index">
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm font-medium text-gray-700">{{ stage.stage }}</span>
-                <span class="text-sm font-semibold">{{ stage.value }}%</span>
-              </div>
-              <div class="w-full bg-gray-200 rounded-full h-2.5">
-                <div
-                  class="h-2.5 rounded-full transition-all duration-300"
-                  :style="{ width: `${stage.value}%`, backgroundColor: stage.color }"
-                ></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bottom Row -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Device Analytics -->
-        <div class="bg-white rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold mb-4">Device Analytics</h3>
-          <div class="space-y-4">
-            <div
-              v-for="(device, index) in dashboardData.deviceAnalytics"
-              :key="index"
-              class="flex items-center justify-between"
-            >
-              <div class="flex items-center">
-                <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center mr-3">
-                  <i :class="device.icon" class="text-blue-600 text-xl"></i>
-                </div>
-                <div>
-                  <div class="font-medium text-gray-900">{{ device.device }}</div>
-                  <div class="text-sm text-gray-500">{{ device.users.toLocaleString() }} users</div>
-                </div>
-              </div>
-              <div class="text-right">
-                <div class="font-semibold text-gray-900">{{ calculatePercentage(device.users) }}%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Top Performing Pages -->
-        <div class="bg-white rounded-lg p-6 shadow-sm">
-          <h3 class="text-lg font-semibold mb-4">Top Performing Pages</h3>
-          <div class="space-y-3">
-            <div
-              v-for="(page, index) in dashboardData.topPages"
-              :key="index"
-              class="flex items-center text-sm border-b border-gray-100 pb-3 last:border-0"
-            >
-              <div class="w-8 font-semibold text-gray-500">#{{ page.rank }}</div>
-              <div class="flex-1 min-w-0">
-                <div class="font-medium text-gray-900 truncate">{{ page.url }}</div>
-                <div class="text-gray-500 flex items-center space-x-3 mt-1">
-                  <span>{{ page.views }} views</span>
-                  <span>•</span>
-                  <span>{{ page.avgTime }} avg</span>
-                  <span>•</span>
-                  <span>{{ page.bounce }} bounce</span>
-                </div>
               </div>
             </div>
           </div>
@@ -180,11 +98,9 @@ export default {
   setup() {
     const usersStore = useUsersStore();
     const userGrowthChart = ref(null);
-    const pageViewsChart = ref(null);
     const trafficSourcesChart = ref(null);
 
     let userGrowthChartInstance = null;
-    let pageViewsChartInstance = null;
     let trafficSourcesChartInstance = null;
 
     const totalUsersCount = usersStore.users.length;
@@ -193,8 +109,7 @@ export default {
       metrics: {
         totalUsers: { title: 'Total Users', value: totalUsersCount, icon: 'pi pi-users' },
         pageViews: { title: 'Page Views', value: 482, icon: 'pi pi-eye' },
-        avgSession: { title: 'Avg Session', value: 2.34, icon: 'pi pi-clock' },
-        bounceRate: { title: 'Bounce Rate', value: 3, icon: 'pi pi-chart-line' }
+        avgSession: { title: 'Avg Session', value: 2.34, icon: 'pi pi-clock' }
       },
       userGrowth: [
         { month: 'M1', newUsers: 45, returningUsers: 30 },
@@ -203,15 +118,6 @@ export default {
         { month: 'M4', newUsers: 65, returningUsers: 48 },
         { month: 'M5', newUsers: 72, returningUsers: 55 },
         { month: 'M6', newUsers: 78, returningUsers: 60 }
-      ],
-      pageViews: [
-        { day: 'M1', totalViews: 85, uniqueVisitors: 65 },
-        { day: 'M2', totalViews: 95, uniqueVisitors: 72 },
-        { day: 'M3', totalViews: 88, uniqueVisitors: 68 },
-        { day: 'M4', totalViews: 105, uniqueVisitors: 82 },
-        { day: 'M5', totalViews: 128, uniqueVisitors: 95 },
-        { day: 'M6', totalViews: 98, uniqueVisitors: 75 },
-        { day: 'M7', totalViews: 92, uniqueVisitors: 70 }
       ],
       trafficSources: [
         { name: 'Direct', value: 4500, color: '#3b82f6' },
@@ -249,7 +155,6 @@ export default {
     const initializeCharts = () => {
       // Destroy existing charts to prevent duplicates
       if (userGrowthChartInstance) userGrowthChartInstance.destroy();
-      if (pageViewsChartInstance) pageViewsChartInstance.destroy();
       if (trafficSourcesChartInstance) trafficSourcesChartInstance.destroy();
 
       // User Growth Chart
@@ -274,42 +179,6 @@ export default {
                 backgroundColor: 'rgba(16, 185, 129, 0.1)',
                 fill: true,
                 tension: 0.4
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom'
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true
-              }
-            }
-          }
-        });
-      }
-
-      // Page Views Chart
-      if (pageViewsChart.value) {
-        pageViewsChartInstance = new Chart(pageViewsChart.value, {
-          type: 'bar',
-          data: {
-            labels: dashboardData.value.pageViews.map(d => d.day),
-            datasets: [
-              {
-                label: 'Total Views',
-                data: dashboardData.value.pageViews.map(d => d.totalViews),
-                backgroundColor: '#3b82f6'
-              },
-              {
-                label: 'Unique Visitors',
-                data: dashboardData.value.pageViews.map(d => d.uniqueVisitors),
-                backgroundColor: '#10b981'
               }
             ]
           },
@@ -383,13 +252,11 @@ export default {
     onBeforeUnmount(() => {
       // Clean up chart instances
       if (userGrowthChartInstance) userGrowthChartInstance.destroy();
-      if (pageViewsChartInstance) pageViewsChartInstance.destroy();
       if (trafficSourcesChartInstance) trafficSourcesChartInstance.destroy();
     });
 
     return {
       userGrowthChart,
-      pageViewsChart,
       trafficSourcesChart,
       dashboardData,
       calculatePercentage,

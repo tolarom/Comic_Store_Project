@@ -1,11 +1,11 @@
 <template>
-  <div class="min-h-screen w-screen flex">
-    <div class="hidden md:flex md:w-[40%] bg-black sticky top-0 h-screen">
+  <div class="min-h-screen w-screen flex overflow-x-hidden relative">
+    <div class="hidden md:block md:w-[40%] bg-black fixed top-0 left-0 h-screen z-10">
       <img :src="poster1" alt="Poster" class="w-full h-full object-cover" />
     </div>
 
     <div
-      class="w-full md:w-[60%] flex items-start justify-center p-6 md:p-16 bg-white overflow-y-vertical"
+      class="w-full md:w-[60%] md:ml-[40%] flex items-start justify-center p-6 md:p-16 bg-white overflow-y-auto min-h-screen"
     >
       <div class="w-full max-w-xl">
         <div class="text-center md:text-left mt-8 md:mt-0">
@@ -161,5 +161,6 @@ const onSubmit = () => {
 #app {
   max-width: none !important;
   width: 100% !important;
+  overflow-x: hidden !important;
 }
 </style>

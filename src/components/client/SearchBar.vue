@@ -172,11 +172,11 @@
             </div>
           </transition>
         </div>
-        <router-link to="/client/cart" class="relative">
+        <router-link to="/client/cart" class="relative cursor-pointer">
           <i class="pi pi-shopping-cart text-2xl"></i>
           <span
             v-if="cartStore.totalItems > 0"
-            class="absolute top-3 right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
+            class="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center"
           >
             {{ cartStore.totalItems }}
           </span>

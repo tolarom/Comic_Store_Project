@@ -18,7 +18,7 @@
         <li class="relative" v-for="(menu, index) in dropdowns" :key="index">
           <button
             @click="toggleDropdown(index)"
-            class="flex items-center gap-1.5 hover:text-gray-200 transition-all duration-200 group"
+            class="flex items-center gap-1.5 hover:text-gray-200 transition-all duration-200 group cursor-pointer"
           >
             {{ menu.title }}
             <span
@@ -123,7 +123,6 @@
       :class="isNavVisible ? 'top-[82px] opacity-100' : '-top-[200px] opacity-0'"
     >
       <router-link to="/new">NEW ARRIVALS</router-link>
-      <router-link to="/best">BEST SELLERS</router-link>
       <div v-for="(menu, index) in dropdowns" :key="index">
         <button
           @click="toggleDropdown(index)"
@@ -149,7 +148,7 @@
           >
             <li v-for="(item, i) in menu.items" :key="i">
               <router-link
-                class="block px-4 py-2 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
+                class="block px-4 py-2 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2 cursor-pointer"
                 :to="item.link"
               >
                 <i class="pi pi-circle-fill text-[6px]"></i>
@@ -237,5 +236,5 @@ const toggleDropdown = (index) => {
 </script>
 
 <style scoped>
-/* optional: you can add hover effects or transitions here */
+
 </style>

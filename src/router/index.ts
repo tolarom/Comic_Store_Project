@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import LoginPage from '@/views/authorize/LogIn-Page.vue'
-import SignUpPage from '@/views/authorize/SignUp-Page.vue'
+import LoginPage from '@/views/Auth/LogIn-Page.vue'
+import SignUpPage from '@/views/Auth/SignUp-Page.vue'
 import ShopCart from '@/views/Client/ShopCart-Page.vue'
 import Checkout from '@/views/Client/Checkout-Page.vue'
 import Profile from '@/views/Client/profileview-Page.vue'

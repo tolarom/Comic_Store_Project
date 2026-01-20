@@ -9,7 +9,7 @@
       </div>
 
       <!-- Simple Stats -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="bg-white rounded-lg p-4 shadow-sm">
           <p class="text-sm text-gray-600">Total</p>
           <p class="text-2xl font-bold text-gray-900">{{ orders.length }}</p>
@@ -25,6 +25,10 @@
         <div class="bg-white rounded-lg p-4 shadow-sm">
           <p class="text-sm text-gray-600">Delivered</p>
           <p class="text-2xl font-bold text-green-600">{{ deliveredOrders }}</p>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow-sm">
+          <p class="text-sm text-gray-600">Pickups</p>
+          <p class="text-2xl font-bold text-purple-600">{{ pickupOrders }}</p>
         </div>
       </div>
 
@@ -50,6 +54,14 @@
             <option value="shipped">Shipped</option>
             <option value="delivered">Delivered</option>
           </select>
+          <select
+            v-model="deliveryFilter"
+            class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Delivery</option>
+            <option value="shipping">Shipping</option>
+            <option value="pickup">Pickup</option>
+          </select>
         </div>
       </div>
 
@@ -62,6 +74,7 @@
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Total</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Delivery</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
             </tr>
@@ -76,6 +89,11 @@
               <td class="px-6 py-4 text-sm">{{ formatDate(order.created_at) }}</td>
               <td class="px-6 py-4 font-semibold">${{ order.total_amount.toFixed(2) }}</td>
               <td class="px-6 py-4">
+                <span :class="getDeliveryClass(order.delivery_method)">
+                  {{ order.delivery_method === 'pickup' ? 'Pickup' : 'Shipping' }}
+                </span>
+              </td>
+              <td class="px-6 py-4">
                 <span :class="getStatusClass(order.status)">{{ order.status }}</span>
               </td>
               <td class="px-6 py-4">
@@ -84,11 +102,19 @@
                   @change="updateOrderStatus(order)"
                   class="px-3 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="pending">Pending</option>
-                  <option value="processing">Processing</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
+                  <template v-if="order.delivery_method === 'pickup'">
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </template>
+                  <template v-else>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="delivered">Delivered</option>
+                    <option value="cancelled">Cancelled</option>
+                  </template>
                 </select>
               </td>
             </tr>
@@ -111,6 +137,7 @@ import Header from '@/components/Admin/NavigationBar.vue'
 
 const searchQuery = ref('')
 const statusFilter = ref('all')
+const deliveryFilter = ref('all')
 
 const orders = ref([
   {
@@ -120,6 +147,7 @@ const orders = ref([
     created_at: '2026-01-15T10:30:00',
     total_amount: 89.99,
     status: 'delivered',
+    delivery_method: 'shipping',
     items: [
       { name: 'Spider-Man Vol 1', quantity: 2, price: 29.99 },
       { name: 'Batman Issue #1', quantity: 1, price: 30.01 }
@@ -131,7 +159,8 @@ const orders = ref([
     user_email: 'jane@example.com',
     created_at: '2026-01-18T14:20:00',
     total_amount: 45.50,
-    status: 'shipped',
+    status: 'pending',
+    delivery_method: 'pickup',
     items: [
       { name: 'X-Men Collection', quantity: 1, price: 45.50 }
     ]
@@ -143,6 +172,7 @@ const orders = ref([
     created_at: '2026-01-19T09:15:00',
     total_amount: 120.00,
     status: 'processing',
+    delivery_method: 'shipping',
     items: [
       { name: 'Marvel Complete Set', quantity: 1, price: 120.00 }
     ]
@@ -154,6 +184,7 @@ const orders = ref([
     created_at: '2026-01-10T16:45:00',
     total_amount: 67.98,
     status: 'pending',
+    delivery_method: 'pickup',
     items: [
       { name: 'Wonder Woman #1', quantity: 2, price: 25.99 },
       { name: 'The Flash Comics', quantity: 1, price: 16.00 }
@@ -166,6 +197,10 @@ const filteredOrders = computed(() => {
 
   if (statusFilter.value !== 'all') {
     filtered = filtered.filter(order => order.status === statusFilter.value)
+  }
+
+  if (deliveryFilter.value !== 'all') {
+    filtered = filtered.filter(order => order.delivery_method === deliveryFilter.value)
   }
 
   if (searchQuery.value) {
@@ -184,6 +219,7 @@ const filteredOrders = computed(() => {
 const pendingOrders = computed(() => orders.value.filter(o => o.status === 'pending').length)
 const shippedOrders = computed(() => orders.value.filter(o => o.status === 'shipped').length)
 const deliveredOrders = computed(() => orders.value.filter(o => o.status === 'delivered').length)
+const pickupOrders = computed(() => orders.value.filter(o => o.delivery_method === 'pickup').length)
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
@@ -196,9 +232,18 @@ const getStatusClass = (status: string) => {
     processing: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700',
     shipped: 'px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700',
     delivered: 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700',
+    completed: 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700',
     cancelled: 'px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700'
   }
   return classes[status] || 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700'
+}
+
+const getDeliveryClass = (method: string) => {
+  const classes = {
+    pickup: 'px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700',
+    shipping: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700'
+  }
+  return classes[method] || 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700'
 }
 
 const updateOrderStatus = (order: any) => {
