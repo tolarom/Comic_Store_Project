@@ -323,11 +323,6 @@ export default {
           link: '/admin/dashboard'
         },
         {
-          name: 'Analytics',
-          icon: 'pi pi-chart-line',
-          link: '/admin/analytics'
-        },
-        {
           name: 'E-Commerce',
           icon: 'pi pi-shopping-bag',
           link: '/admin/e-commerce'
@@ -420,7 +415,7 @@ export default {
     getTimeAgo(dateString) {
       const date = new Date(dateString)
       const now = new Date()
-      const seconds = Math.floor((now - date) / 1000)
+      const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
       
       if (seconds < 60) return 'just now'
       const minutes = Math.floor(seconds / 60)
