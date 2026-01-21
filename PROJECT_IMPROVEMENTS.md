@@ -4,6 +4,112 @@
 
 This document outlines all improvements made to the Comic Store project to enhance code quality, maintainability, performance, and user experience.
 
+## 🗄️ Database Schema (dbdiagram.io)
+
+Below is the SQL-first DBML schema that fits the current product, user, cart, rating, and order flows. Paste into https://dbdiagram.io to visualize or export.
+
+```dbml
+Table users {
+  id int [pk, increment]
+  name varchar(150)
+  email varchar(150) [unique, not null]
+  password_hash varchar(255)
+  role users_role [default: 'Customer', not null]
+  status users_status [default: 'Active', not null]
+  phone varchar(50)
+  address text
+  joined_date date
+  last_login datetime
+  total_orders int [default: 0]
+  total_spent decimal(12,2) [default: 0]
+  created_at datetime [default: `now()`]
+  updated_at datetime [default: `now()`]
+}
+
+Enum users_role { Customer; Admin }
+Enum users_status { Active; Blocked }
+
+Table categories {
+  id int [pk, increment]
+  name varchar(80) [not null]
+  slug varchar(120) [unique, not null]
+  created_at datetime [default: `now()`]
+  updated_at datetime [default: `now()`]
+}
+
+Table products {
+  id int [pk, increment]
+  category_id int [ref: > categories.id]
+  title varchar(200) [not null]
+  subtitle varchar(200)
+  description text
+  price decimal(10,2) [not null]
+  discount int [default: 0] // percent off
+  rating decimal(3,2) [default: 0]
+  review_count int [default: 0]
+  image varchar(300)
+  stock int [default: 0]
+  sales int [default: 0]
+  created_at datetime [default: `now()`]
+  updated_at datetime [default: `now()`]
+}
+
+Table carts {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  status cart_status [default: 'Active']
+  created_at datetime [default: `now()`]
+  updated_at datetime [default: `now()`]
+}
+
+Enum cart_status { Active; Converted; Abandoned }
+
+Table cart_items {
+  id int [pk, increment]
+  cart_id int [ref: > carts.id, not null]
+  product_id int [ref: > products.id, not null]
+  quantity int [not null, default: 1]
+  selected bool [default: true]
+  unit_price decimal(10,2) [not null] // snapshot at add time
+  discount int [default: 0] // percent
+  created_at datetime [default: `now()`]
+}
+
+Table orders {
+  id int [pk, increment]
+  user_id int [ref: > users.id]
+  status order_status [default: 'Pending', not null]
+  subtotal decimal(12,2) [default: 0]
+  discount_total decimal(12,2) [default: 0]
+  shipping_fee decimal(12,2) [default: 0]
+  total decimal(12,2) [default: 0]
+  placed_at datetime [default: `now()`]
+  paid_at datetime
+  updated_at datetime [default: `now()`]
+}
+
+Enum order_status { Pending; Paid; Shipped; Delivered; Cancelled }
+
+Table order_items {
+  id int [pk, increment]
+  order_id int [ref: > orders.id, not null]
+  product_id int [ref: > products.id, not null]
+  quantity int [not null, default: 1]
+  unit_price decimal(10,2) [not null]
+  discount int [default: 0]
+  line_total decimal(12,2) [not null]
+}
+
+Table reviews {
+  id int [pk, increment]
+  user_id int [ref: > users.id, not null]
+  product_id int [ref: > products.id, not null]
+  rating int [not null, note: '1-5 stars']
+  comment text
+  created_at datetime [default: `now()`]
+}
+```
+
 ---
 
 ## 🔧 Critical Fixes
