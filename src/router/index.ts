@@ -11,7 +11,6 @@ import ProductDetail from '@/views/Client/Product-detail.vue'
 import RatingPage from '@/views/Client/Rating-Page.vue'
 import ClientSettings from '@/views/Client/Settings-Page.vue'
 import PurchaseHistory from '@/views/Client/PurchaseHistory.vue'
-import Analytics from '@/views/Admin/Analytics.vue'
 import AdminDashboard from '@/views/Admin/Dashboard.vue'
 import ECommerce from '@/views/Admin/E-Commerce.vue'
 import Admin_profile from '@/views/Admin/Admin_profile.vue'
@@ -108,11 +107,6 @@ const routes = [
     path: '/admin/dashboard',
     name: 'Dashboard',
     component: AdminDashboard,
-  },
-  {
-    path: '/admin/analytics',
-    name: 'Analytics',
-    component: Analytics,
   },
   {
     path: '/admin/e-commerce',
