@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 
 import LoginPage from '@/views/Auth/LogIn-Page.vue'
 import SignUpPage from '@/views/Auth/SignUp-Page.vue'
@@ -19,6 +20,15 @@ import UserControl from '@/views/Admin/UserControl.vue'
 import OrderHistory from '@/views/Admin/OrderHistory.vue'
 
 const routes = [
+  // Root - redirect to login or home based on auth
+  {
+    path: '/',
+    redirect: () => {
+      const isAuthenticated = !!localStorage.getItem('authToken')
+      return isAuthenticated ? '/client/shop' : '/loginPage'
+    },
+  },
+
   // Authentication routes (public)
   {
     path: '/loginPage',
@@ -33,111 +43,112 @@ const routes = [
     meta: { requiresAuth: false, title: 'Sign Up' },
   },
 
-  // Home and main routes
-  {
-    path: '/',
-    name: 'Homeview',
-    component: Homeview,
-  },
+  // Client routes
   {
     path: '/client/shop',
-    name: 'Shop',
+    name: 'Homeview',
     component: Homeview,
+    meta: { requiresAuth: true, title: 'Home' },
   },
-// Protected client routes (require authentication)
 
   // Product routes
   {
     path: '/client/products',
     name: 'ProductPage',
     component: ProductPage,
-    meta: { title: 'Shop' },
+    meta: { requiresAuth: true, title: 'Shop' },
   },
   {
     path: '/client/products/:id',
     name: 'ProductDetail',
     component: ProductDetail,
-    meta: { title: 'Product Details' },
+    meta: { requiresAuth: true, title: 'Product Details' },
   },
 
-  
   {
     path: '/client/cart',
     name: 'ShopCart',
     component: ShopCart,
-    meta: { title: 'Shopping Cart' },
+    meta: { requiresAuth: true, title: 'Shopping Cart' },
   },
   {
     path: '/client/checkout',
     name: 'CheckOut',
     component: Checkout,
-    meta: { title: 'Checkout' },
+    meta: { requiresAuth: true, title: 'Checkout' },
   },
   {
     path: '/client/profile',
     name: 'Profile',
     component: Profile,
-    meta: { title: 'My Profile' },
+    meta: { requiresAuth: true, title: 'My Profile' },
   },
   {
     path: '/client/rating',
     name: 'Rating',
     component: RatingPage,
-    meta: { title: 'Leave a Rating' },
+    meta: { requiresAuth: true, title: 'Leave a Rating' },
   },
   {
     path: '/client/settings',
     name: 'ClientSettings',
     component: ClientSettings,
-    meta: { title: 'Account Settings' },
+    meta: { requiresAuth: true, title: 'Account Settings' },
   },
   {
     path: '/client/orders',
     name: 'PurchaseHistory',
     component: PurchaseHistory,
-    meta: { title: 'Purchase History' },
+    meta: { requiresAuth: true, title: 'Purchase History' },
   },
 
   // Admin routes
   {
     path: '/admin',
     redirect: '/admin/dashboard',
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/dashboard',
     name: 'Dashboard',
     component: AdminDashboard,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/e-commerce',
     name: 'ECommerce',
     component: ECommerce,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/profile',
     name: 'AdminProfile',
     component: Admin_profile,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/setting',
     name: 'Setting',
     component: Setting,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/users',
     name: 'UserControl',
     component: UserControl,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
     path: '/admin/orders',
     name: 'OrderHistory',
     component: OrderHistory,
+    meta: { requiresAuth: true, requiresAdmin: true },
   },
 
   // Catch-all route for 404 - MUST BE LAST
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/',
+    redirect: '/loginPage',
     meta: { title: 'Not Found' },
   },
 ]
@@ -150,31 +161,38 @@ const router = createRouter({
   },
 })
 
-// Route guard for authentication and logging
+// Route guard for authentication and authorization
 router.beforeEach((to, from, next) => {
+  const auth = useAuth()
+
+  // Initialize auth from localStorage
+  auth.initializeAuth()
+
   // Update document title
   const title = to.meta.title ? `${to.meta.title} - Comic Store` : 'Comic Store'
   document.title = title
 
-  // Check if user is authenticated
-  const isAuthenticated = !!localStorage.getItem('authToken')
+  // Check authentication
+  const isAuthenticated = auth.isAuthenticated.value
+  const isAdmin = auth.isAdmin.value
+  const requiresAuth = to.meta.requiresAuth === true
+  const requiresAdmin = to.meta.requiresAdmin === true
 
-  // Redirect to login if trying to access protected routes without auth
-  if (
-    to.meta.requiresAuth !== false &&
-    !isAuthenticated &&
-    to.path !== '/' &&
-    to.path !== '/client/shop'
-  ) {
-    // Allow public routes
-    if (to.path !== '/loginPage' && to.path !== '/signUpPage') {
-      return next('/loginPage')
-    }
+  // Redirect to login if accessing protected route without auth
+  if (requiresAuth && !isAuthenticated) {
+    console.warn(`Access denied to ${to.path} - redirecting to login`)
+    return next('/loginPage')
+  }
+
+  // Redirect to home if accessing admin route without admin role
+  if (requiresAdmin && isAuthenticated && !isAdmin) {
+    console.warn(`Access denied to ${to.path} - user is not admin`)
+    return next('/client/shop')
   }
 
   // Redirect already logged in users away from login/signup pages
   if (isAuthenticated && (to.path === '/loginPage' || to.path === '/signUpPage')) {
-    return next('/')
+    return next('/client/shop')
   }
 
   next()

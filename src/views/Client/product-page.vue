@@ -16,6 +16,7 @@
           <select
             class="border border-gray-400 rounded px-3 py-1 text-sm"
             v-model="selectedCategory"
+            :disabled="loading"
           >
             <option value="all">All Categories</option>
             <option value="comics">Comics</option>
@@ -28,7 +29,11 @@
         <!-- Sort By -->
         <div class="sort-by">
           <label class="text-sm mr-2">SORT BY:</label>
-          <select class="border border-gray-400 rounded px-3 py-1 text-sm" v-model="sortOption">
+          <select 
+            class="border border-gray-400 rounded px-3 py-1 text-sm" 
+            v-model="sortOption"
+            :disabled="loading"
+          >
             <option value="default">default</option>
             <option value="price-low">Price: Low to High</option>
             <option value="price-high">Price: High to Low</option>
@@ -40,54 +45,77 @@
     </div>
   </div>
 
+  <!-- Main Content -->
   <div class="products-section">
-    <h2 class="section-title">Products</h2>
-    <transition-group name="products" tag="div" class="products-grid">
-      <ProductCard
-        v-for="product in paginatedProducts"
-        :key="product.id"
-        :product="product"
-        @add-to-cart="addToCart"
-      />
-    </transition-group>
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-container">
+      <p class="loading-text">Loading products...</p>
+    </div>
 
-    <!-- Pagination Controls -->
-    <div v-if="totalPages > 1" class="pagination-controls">
-      <button
-        @click="prevPage"
-        :disabled="currentPage === 1"
-        class="pagination-btn"
-        :class="{ disabled: currentPage === 1 }"
-      >
-        <i class="pi pi-chevron-left"></i>
-        Previous
-      </button>
+    <!-- Error State -->
+    <div v-else-if="error && products.length === 0" class="error-container">
+      <p class="error-text">{{ error }}</p>
+      <button @click="reloadProducts" class="retry-btn">Try Again</button>
+      <p class="debug-info">Backend URL: {{ backendUrl }}</p>
+    </div>
 
-      <div class="page-info">
-        <span class="page-numbers">
-          <button
-            v-for="page in displayedPages"
-            :key="page"
-            @click="goToPage(page)"
-            class="page-number"
-            :class="{ active: page === currentPage }"
-          >
-            {{ page }}
-          </button>
-        </span>
+    <!-- Products Section -->
+    <div v-else>
+      <h2 class="section-title">Products</h2>
+      
+      <!-- No Products Message -->
+      <div v-if="paginatedProducts.length === 0" class="no-products">
+        <p>No products found matching your criteria.</p>
       </div>
 
-      <button
-        @click="nextPage"
-        :disabled="currentPage === totalPages"
-        class="pagination-btn"
-        :class="{ disabled: currentPage === totalPages }"
-      >
-        Next
-        <i class="pi pi-chevron-right"></i>
-      </button>
+      <transition-group v-else name="products" tag="div" class="products-grid">
+        <ProductCard
+          v-for="product in paginatedProducts"
+          :key="product.id"
+          :product="product"
+          @add-to-cart="addToCart"
+        />
+      </transition-group>
+
+      <!-- Pagination Controls -->
+      <div v-if="totalPages > 1" class="pagination-controls">
+        <button
+          @click="prevPage"
+          :disabled="currentPage === 1"
+          class="pagination-btn"
+          :class="{ disabled: currentPage === 1 }"
+        >
+          <i class="pi pi-chevron-left"></i>
+          Previous
+        </button>
+
+        <div class="page-info">
+          <span class="page-numbers">
+            <button
+              v-for="page in displayedPages"
+              :key="page"
+              @click="goToPage(page)"
+              class="page-number"
+              :class="{ active: page === currentPage }"
+            >
+              {{ page }}
+            </button>
+          </span>
+        </div>
+
+        <button
+          @click="nextPage"
+          :disabled="currentPage === totalPages"
+          class="pagination-btn"
+          :class="{ disabled: currentPage === totalPages }"
+        >
+          Next
+          <i class="pi pi-chevron-right"></i>
+        </button>
+      </div>
     </div>
   </div>
+
   <FooterPage />
 </template>
 
@@ -105,9 +133,39 @@ const cartStore = useCartStore()
 const { searchQuery } = useSearch()
 
 const productsStore = useProductsStore()
-const products = computed(() => productsStore.products)
 const route = useRoute()
 const router = useRouter()
+
+// State
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+// Exposed for template
+const backendUrl = computed(() => import.meta.env.VITE_API_URL || 'http://localhost:8080')
+
+// Fetch products from store
+onMounted(async () => {
+  try {
+    loading.value = true
+    error.value = null
+    console.log('Fetching products from store...')
+    
+    await productsStore.fetchProducts()
+    
+    if (productsStore.products.length === 0) {
+      error.value = 'No products found. Backend may be down.'
+    }
+    
+    loading.value = false
+  } catch (err) {
+    console.error('Error fetching products:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to load products'
+    loading.value = false
+  }
+})
+
+// Alias for template
+const products = computed(() => productsStore.products)
 
 const productQuantity = computed(() => products.value.length)
 
@@ -256,6 +314,24 @@ const addToCart = (product: ProductItem) => {
     image: product.image,
   })
 }
+
+const reloadProducts = async () => {
+  try {
+    loading.value = true
+    error.value = null
+    
+    await productsStore.fetchProducts()
+    
+    if (productsStore.products.length === 0) {
+      error.value = 'No products found'
+    }
+    
+    loading.value = false
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Error loading products'
+    loading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -277,6 +353,80 @@ select {
   font-size: 2rem;
   font-weight: bold;
   margin-bottom: 2rem;
+}
+
+/* Loading State */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.loading-text {
+  font-size: 1.2rem;
+  color: #666;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Error State */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  gap: 1rem;
+}
+
+.error-text {
+  font-size: 1.2rem;
+  color: #e74c3c;
+  text-align: center;
+}
+
+.debug-info {
+  font-size: 0.9rem;
+  color: #999;
+  text-align: center;
+  margin-top: 1rem;
+  font-family: monospace;
+}
+
+.retry-btn {
+  padding: 0.75rem 1.5rem;
+  background: #5f6fff;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+  background: #4a5dd8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(95, 111, 255, 0.3);
+}
+
+/* No Products */
+.no-products {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  font-size: 1.1rem;
+  color: #666;
 }
 
 .products-grid {
