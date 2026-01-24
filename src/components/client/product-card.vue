@@ -10,9 +10,9 @@
     <div class="product-footer">
       <div class="product-price">
         <p class="current-price">{{ discountedPrice }}</p>
-        <p class="original-price" v-if="product.discount">{{ product.price }}</p>
+        <p class="original-price" v-if="product.discount">${{ Number(product.price).toFixed(2) }}</p>
       </div>
-      <div class="discount-badge" v-if="product.discount">{{ product.discount }}% off</div>
+      <div class="discount-badge" v-if="product.discount">{{ Number(product.discount).toFixed(2) }}% off</div>
       <button class="add-to-cart-btn" @click.stop="addToCart">Add to Cart</button>
     </div>
     <StarRating :rating="product.rating" :read-only="true" :increment="0.1" :star-size="starSize" />
@@ -62,10 +62,10 @@ export default {
   },
   computed: {
     discountedPrice() {
-      if (this.product.discount) {
-        return (this.product.price * (1 - this.product.discount / 100)).toFixed(2)
-      }
-      return this.product.price
+      const price = Number(this.product.price) || 0
+      const discount = Number(this.product.discount) || 0
+      const result = discount ? price * (1 - discount / 100) : price
+      return result.toFixed(2)
     },
     starSize() {
       // Responsive star size based on screen width

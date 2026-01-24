@@ -132,94 +132,111 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Header from '@/components/Admin/NavigationBar.vue'
+import {
+  getAllOrders as apiGetAllOrders,
+  updateOrderStatus as apiUpdateOrderStatus,
+  getAllUsers as apiGetAllUsers,
+} from '@/services/api'
 
 const searchQuery = ref('')
 const statusFilter = ref('all')
 const deliveryFilter = ref('all')
 
-const orders = ref([
-  {
-    _id: 'ORD-2026-001',
-    user_name: 'John Doe',
-    user_email: 'john@example.com',
-    created_at: '2026-01-15T10:30:00',
-    total_amount: 89.99,
-    status: 'delivered',
-    delivery_method: 'shipping',
-    items: [
-      { name: 'Spider-Man Vol 1', quantity: 2, price: 29.99 },
-      { name: 'Batman Issue #1', quantity: 1, price: 30.01 }
-    ]
-  },
-  {
-    _id: 'ORD-2026-002',
-    user_name: 'Jane Smith',
-    user_email: 'jane@example.com',
-    created_at: '2026-01-18T14:20:00',
-    total_amount: 45.50,
-    status: 'pending',
-    delivery_method: 'pickup',
-    items: [
-      { name: 'X-Men Collection', quantity: 1, price: 45.50 }
-    ]
-  },
-  {
-    _id: 'ORD-2026-003',
-    user_name: 'Bob Johnson',
-    user_email: 'bob@example.com',
-    created_at: '2026-01-19T09:15:00',
-    total_amount: 120.00,
-    status: 'processing',
-    delivery_method: 'shipping',
-    items: [
-      { name: 'Marvel Complete Set', quantity: 1, price: 120.00 }
-    ]
-  },
-  {
-    _id: 'ORD-2026-004',
-    user_name: 'Alice Brown',
-    user_email: 'alice@example.com',
-    created_at: '2026-01-10T16:45:00',
-    total_amount: 67.98,
-    status: 'pending',
-    delivery_method: 'pickup',
-    items: [
-      { name: 'Wonder Woman #1', quantity: 2, price: 25.99 },
-      { name: 'The Flash Comics', quantity: 1, price: 16.00 }
-    ]
+const orders = ref<any[]>([])
+const loading = ref(false)
+
+const loadOrders = async () => {
+  loading.value = true
+  try {
+    const [fetchedOrders, users] = await Promise.all([
+      apiGetAllOrders().catch((e) => {
+        console.warn('Failed to fetch orders from API', e)
+        return [] as any[]
+      }),
+      apiGetAllUsers().catch(() => []),
+    ])
+
+    const normalizeId = (raw: any) => {
+      if (!raw) return null
+      if (typeof raw === 'string') return raw
+      if (raw.$oid) return raw.$oid
+      if (raw.toString && typeof raw.toString === 'function') return raw.toString()
+      return String(raw)
+    }
+    const userMap = new Map<string, any>()
+    users.forEach((u: any) => {
+      const keys = [normalizeId(u._id), normalizeId(u.id), u.username, String(u.email || '')]
+      keys.forEach((k) => {
+        if (k) userMap.set(String(k), u)
+      })
+    })
+
+    orders.value = (fetchedOrders || []).map((o: any) => {
+      const id = normalizeId(o._id) || normalizeId(o.id) || normalizeId(o.order_id) || `ORD-${Math.random().toString(36).slice(2, 9)}`
+      // attempt to resolve user via multiple possible keys
+      const rawUserId = o.user_id || (o.user && (o.user._id || o.user.id))
+      const nUserId = normalizeId(rawUserId)
+      let user = o.user || (nUserId && userMap.get(String(nUserId))) || userMap.get(String(rawUserId)) || {}
+      if ((!user || Object.keys(user).length === 0) && o.user_email) {
+        // fallback: try find by email
+        user = users.find((uu: any) => String(uu.email || '').toLowerCase() === String(o.user_email || '').toLowerCase()) || {}
+      }
+      return {
+        _id: id,
+        user_name: user.full_name || user.username || user.name || 'Unknown',
+        user_email: user.email || '',
+        created_at: o.created_at || o.createdAt || new Date().toISOString(),
+        total_amount: o.total_price || o.total_amount || 0,
+        status: o.status || 'pending',
+        delivery_method: o.order_type || o.delivery_method || o.delivery || 'shipping',
+        items: (o.products || o.items || []).map((it: any) => ({
+          name: it.name || it.product_id || 'Product',
+          quantity: it.quantity || it.qty || 1,
+          price: it.price || 0,
+        })),
+      }
+    })
+  } catch (e) {
+    console.error('Error loading orders:', e)
+  } finally {
+    loading.value = false
   }
-])
+}
+
+onMounted(() => {
+  loadOrders()
+})
 
 const filteredOrders = computed(() => {
   let filtered = orders.value
 
   if (statusFilter.value !== 'all') {
-    filtered = filtered.filter(order => order.status === statusFilter.value)
+    filtered = filtered.filter((order: any) => order.status === statusFilter.value)
   }
 
   if (deliveryFilter.value !== 'all') {
-    filtered = filtered.filter(order => order.delivery_method === deliveryFilter.value)
+    filtered = filtered.filter((order: any) => order.delivery_method === deliveryFilter.value)
   }
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(
-      order =>
-        order._id.toLowerCase().includes(query) ||
-        order.user_name.toLowerCase().includes(query) ||
-        order.user_email.toLowerCase().includes(query)
+      (order: any) =>
+        String(order._id).toLowerCase().includes(query) ||
+        String(order.user_name || '').toLowerCase().includes(query) ||
+        String(order.user_email || '').toLowerCase().includes(query),
     )
   }
 
   return filtered
 })
 
-const pendingOrders = computed(() => orders.value.filter(o => o.status === 'pending').length)
-const shippedOrders = computed(() => orders.value.filter(o => o.status === 'shipped').length)
-const deliveredOrders = computed(() => orders.value.filter(o => o.status === 'delivered').length)
-const pickupOrders = computed(() => orders.value.filter(o => o.delivery_method === 'pickup').length)
+const pendingOrders = computed(() => orders.value.filter((o: any) => o.status === 'pending').length)
+const shippedOrders = computed(() => orders.value.filter((o: any) => o.status === 'shipped').length)
+const deliveredOrders = computed(() => orders.value.filter((o: any) => o.status === 'delivered').length)
+const pickupOrders = computed(() => orders.value.filter((o: any) => o.delivery_method === 'pickup').length)
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString)
@@ -227,26 +244,37 @@ const formatDate = (dateString: string) => {
 }
 
 const getStatusClass = (status: string) => {
-  const classes = {
+  const classes: Record<string, string> = {
     pending: 'px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700',
     processing: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700',
     shipped: 'px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700',
     delivered: 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700',
     completed: 'px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700',
-    cancelled: 'px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700'
+    cancelled: 'px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700',
   }
   return classes[status] || 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700'
 }
 
 const getDeliveryClass = (method: string) => {
-  const classes = {
+  const classes: Record<string, string> = {
     pickup: 'px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700',
-    shipping: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700'
+    shipping: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700',
   }
   return classes[method] || 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700'
 }
 
-const updateOrderStatus = (order: any) => {
-  console.log('Order status updated:', order._id, order.status)
+const updateOrderStatus = async (order: any) => {
+  const previous = order.status
+  try {
+    if (!order._id) throw new Error('Missing order id')
+    await apiUpdateOrderStatus(String(order._id), order.status as any)
+    // refresh list from server
+    await loadOrders()
+  } catch (e) {
+    console.error('Failed to update order status on server, applying locally', e)
+    alert('Failed to update order on server — update applied locally')
+    const idx = orders.value.findIndex((o: any) => o._id === order._id)
+    if (idx !== -1) orders.value[idx].status = order.status
+  }
 }
 </script>

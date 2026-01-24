@@ -51,11 +51,8 @@
       <h3 class="font-semibold text-gray-900 mb-1 line-clamp-2">
         {{ product.name }}
       </h3>
-      <p
-        v-if="product.subtitle || product.category"
-        class="text-xs text-gray-500 mb-2 line-clamp-1"
-      >
-        {{ product.subtitle || product.category }}
+      <p v-if="product.category" class="text-xs text-gray-500 mb-2 line-clamp-1">
+        {{ product.category }}
       </p>
       <p class="text-sm text-gray-500 mb-3 line-clamp-1">
         {{ product.description }}
@@ -84,7 +81,6 @@ import { ref } from 'vue'
 type Product = {
   id: number
   name: string
-  subtitle?: string
   description: string
   price: number
   stock: number

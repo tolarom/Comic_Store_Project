@@ -166,51 +166,82 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useCartStore } from '@/stores/cart'
 import { useScrollDirection } from '@/composables/useScrollDirection'
 import logo from '@/assets/logo.png'
+import { getAllGroups, getCategoriesByGroup } from '@/services/api'
 
 const cartStore = useCartStore()
 const isMenuOpen = ref(false)
 const showProfileMenu = ref(false)
 
-// Dropdown menus
-const dropdowns = reactive([
-  {
-    title: 'BOOKS',
-    open: false,
-    items: [
-      { name: 'Manga', link: '/books/manga' },
-      { name: 'Novels', link: '/books/novel' },
-      { name: 'Comics', link: '/books/comics' },
-    ],
-  },
-  {
-    title: 'CLOTHES',
-    open: false,
-    items: [
-      { name: 'T-Shirts', link: '/clothes/tshirt' },
-      { name: 'Hoodies', link: '/clothes/hoodie' },
-    ],
-  },
-  {
-    title: 'FIGURES',
-    open: false,
-    items: [
-      { name: 'Anime Figures', link: '/figures/anime' },
-      { name: 'Game Figures', link: '/figures/game' },
-    ],
-  },
-  {
-    title: 'ACCESSORIES',
-    open: false,
-    items: [
-      { name: 'Bags', link: '/accessories/bags' },
-      { name: 'Hats', link: '/accessories/hats' },
-    ],
-  },
-])
+// Dropdown menus (populated from backend groups/categories)
+const dropdowns = reactive([] as Array<{ title: string; open: boolean; items: Array<{ name: string; link: string }> }>)
+
+const fetchNavGroups = async () => {
+  try {
+    const groups = await getAllGroups()
+    console.log('Navbar: fetched groups', groups)
+
+    if (!groups || groups.length === 0) {
+      // fallback
+      dropdowns.push({ title: 'SHOP', open: false, items: [{ name: 'All', link: '/client/products' }] })
+      return
+    }
+
+    // Fetch categories in parallel for all groups
+    const fetches = groups.map(async (g) => {
+      // normalize group id to string - backend returns _id: { $oid: '...' }
+      let groupId = ''
+      if ((g as any)._id) {
+        const raw = (g as any)._id
+        groupId = raw.$oid ?? String(raw)
+      } else if ((g as any).id) {
+        groupId = String((g as any).id)
+      } else if ((g as any).slug) {
+        groupId = String((g as any).slug)
+      }
+      if (!groupId) {
+        console.warn('Navbar: group missing id, skipping categories for', g)
+        return {
+          title: g.name,
+          items: [],
+        }
+      }
+      try {
+        const categories = await getCategoriesByGroup(groupId)
+        console.log(`Navbar: categories for group ${g.name}`, categories)
+        return {
+          title: g.name,
+          items: categories.map((c) => ({
+            name: c.name,
+            link: `/client/products?category=${encodeURIComponent(c.slug ?? c.name)}`,
+          })),
+        }
+      } catch (e) {
+        console.error('Navbar: failed to fetch categories for', g, e)
+        return {
+          title: g.name,
+          items: [],
+        }
+      }
+    })
+
+    const results = await Promise.all(fetches)
+    results.forEach((r) => dropdowns.push({ title: r.title, open: false, items: r.items }))
+  } catch (err) {
+    console.error('Failed to load nav groups/categories', err)
+    // on error, provide a reasonable fallback
+    if (dropdowns.length === 0) {
+      dropdowns.push({ title: 'SHOP', open: false, items: [{ name: 'Products', link: '/client/products' }] })
+    }
+  }
+}
+
+onMounted(() => {
+  fetchNavGroups()
+})
 
 // Close all dropdowns and mobile menu
 const closeAllDropdowns = () => {

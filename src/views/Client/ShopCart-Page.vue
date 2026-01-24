@@ -95,14 +95,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
 import NavigationBar from '@/components/client/NavigationBar.vue'
 import CartItem from '@/components/client/cart-item.vue'
 import { useCartStore } from '@/stores/cart'
 import FooterPage from '@/components/client/FooterPage.vue'
 
-const router = useRouter()
 const cartStore = useCartStore()
 
 // Use cart items from store

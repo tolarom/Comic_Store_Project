@@ -327,6 +327,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cart'
 import FooterPage from '@/components/client/FooterPage.vue'
+import { createOrder, getCurrentUser } from '@/services/api'
 
 const cartStore = useCartStore()
 const shippingMethod = ref<'delivery' | 'pickup'>('delivery')
@@ -390,7 +391,7 @@ const canCheckout = computed(() => {
 })
 
 // Submit order
-const placeOrder = () => {
+const placeOrder = async () => {
   if (!canCheckout.value) {
     alert('Please fill in all required fields and agree to terms.')
     return
@@ -398,11 +399,37 @@ const placeOrder = () => {
 
   isPlacingOrder.value = true
 
-  // Simulate payment processing
-  setTimeout(() => {
-    isPlacingOrder.value = false
+  try {
+    // Build order items from selected cart items
+    const items = cartItems.value.map((it) => ({
+      product_id: it.backend_id ? String(it.backend_id) : String(it.id),
+      quantity: it.quantity,
+      price: it.price,
+    }))
+
+    // Determine user id (authenticated user or guest email)
+    const user = getCurrentUser()
+    const uid = user ? user._id || (user as any).id : form.value.email || `guest-${Date.now()}`
+
+    const orderPayload = {
+      user_id: String(uid),
+      products: items,
+      total_price: Number(grandTotal.value),
+      order_type: shippingMethod.value === 'delivery' ? 'shipping' : 'pickup',
+    }
+
+    // Create order on backend
+    await createOrder(orderPayload)
+
+    // On success, remove purchased items from cart and show modal
+    cartStore.removeSelectedItems()
     showSuccessModal.value = true
-  }, 2000)
+  } catch (e) {
+    console.error('Failed to place order:', e)
+    alert('Failed to place order. Please try again.')
+  } finally {
+    isPlacingOrder.value = false
+  }
 }
 
 // Close modal and redirect

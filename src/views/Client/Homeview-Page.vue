@@ -32,10 +32,18 @@ import ProductCard from '@/components/client/product-card.vue'
 import FooterPage from '@/components/client/FooterPage.vue'
 import { useCartStore } from '@/stores/cart'
 import { useProductsStore } from '@/data/products'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const cartStore = useCartStore()
 const productsStore = useProductsStore()
+
+onMounted(async () => {
+  try {
+    await productsStore.fetchProducts()
+  } catch (e) {
+    console.warn('Failed to load products on home mount', e)
+  }
+})
 
 const products = computed(() => productsStore.products)
 

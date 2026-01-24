@@ -40,25 +40,23 @@
 
         <!-- Rating -->
         <div class="flex items-center gap-3 mt-4">
-          <StarRating :rating="product.rating" :read-only="true" :increment="0.1" :star-size="25" />
-          <span class="text-lg font-semibold text-gray-700">{{ product.rating.toFixed(1) }}</span>
-          <span v-if="product.reviewCount" class="text-gray-500"
-            >({{ product.reviewCount }} reviews)</span
-          >
+          <StarRating :rating="avgRating" :read-only="true" :increment="0.1" :star-size="25" />
+          <span class="text-gray-500">({{ ratings.length }} review{{ ratings.length === 1 ? '' : 's' }})</span>
         </div>
 
         <!-- Price -->
         <div class="flex items-center gap-4 mt-6">
           <span class="text-3xl font-bold text-red-500">${{ displayPrice }}</span>
-          <span v-if="product.discount" class="text-xl text-gray-400 line-through"
-            >${{ product.price }}</span
-          >
+          <span v-if="product.discount" class="text-xl text-gray-400 line-through">${{ Number(product.price).toFixed(2) }}</span>
+          <span v-if="product.discount" class="ml-3 text-sm text-green-600">({{ Number(product.discount) }}% off)</span>
         </div>
 
         <hr class="my-8 border-gray-300" />
 
         <!-- Description -->
         <p class="text-gray-600 text-base leading-relaxed">{{ product.description }}</p>
+
+        
 
         <!-- Quantity Selector -->
         <div class="mt-8 flex items-center gap-6">
@@ -80,20 +78,42 @@
           ADD TO CART
         </button>
       </div>
+      
     </div>
+    <!-- Reviews -->
+        <section class="mt-8">
+          <hr>
+          <h3 class="text-xl font-semibold mb-4">Customer reviews</h3>
+
+          <div v-if="loadingRatings" class="text-gray-500">Loading reviews…</div>
+          <div v-else>
+            <div v-if="ratings.length === 0" class="text-gray-500 mb-4">No reviews yet — be the first to review.</div>
+
+            <ul class="space-y-4 mb-6">
+              <li v-for="r in ratings" :key="r._id || r.id" class="border-b pb-4">
+                <div class="flex items-center gap-3">
+                  <StarRating :rating="r.rating" :read-only="true" :increment="0.1" :star-size="18" />
+                  <span class="text-sm text-gray-600">{{ new Date(r.created_at || r.updated_at || Date.now()).toLocaleDateString() }}</span>
+                </div>
+                <p class="mt-2 text-gray-700">{{ r.review }}</p>
+              </li>
+            </ul>
+          </div>
+        </section>
   </div>
   <div v-else class="max-w-7xl mx-auto px-6 py-20 text-center text-gray-500">Loading product…</div>
   <FooterPage />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useProductsStore } from '@/data/products'
 import { useCartStore } from '@/stores/cart'
 import FooterPage from '@/components/client/FooterPage.vue'
 import NavigationBar from '@/components/client/NavigationBar.vue'
 import StarRating from 'vue-star-rating'
+import { getRatingsByProduct } from '@/services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,12 +153,60 @@ const onAddToCart = () => {
 
   // Add item(s) to cart based on quantity
   for (let i = 0; i < qty.value; i++) {
-    cartStore.addToCart({ id: p.id, name: p.title, price, image: p.image })
+    cartStore.addToCart({ id: p.id, backend_id: (p as any).backend_id, name: p.title, price, image: p.image })
   }
 
   // Reset quantity after adding
   qty.value = 1
 }
+
+// --- Reviews state & actions ---
+const ratings = ref<Array<any>>([])
+const loadingRatings = ref(false)
+
+const avgRating = computed(() => {
+  if (ratings.value.length === 0) return 0
+  const sum = ratings.value.reduce((s, r) => s + (r.rating || 0), 0)
+  return sum / ratings.value.length
+})
+
+const loadRatings = async () => {
+  const p = product.value
+  if (!p || !p.backend_id) {
+    console.debug('[Product-detail] product or backend_id missing:', p)
+    return
+  }
+  loadingRatings.value = true
+  try {
+    console.debug('[Product-detail] loading ratings for backend_id:', String(p.backend_id))
+    const resp = await getRatingsByProduct(String(p.backend_id))
+    console.debug('[Product-detail] ratings API response:', resp)
+    ratings.value = Array.isArray(resp) ? resp : []
+  } catch (e) {
+    console.error('Failed to load ratings', e)
+    ratings.value = []
+  } finally {
+    loadingRatings.value = false
+  }
+}
+
+// no submission UI — reviews are read-only
+
+onMounted(async () => {
+  // Ensure products are loaded (in case user navigated directly to detail page)
+  try {
+    const p = product.value
+    if (!p || !p.backend_id) {
+      // fetch products into store so `product` computed can resolve
+      await productsStore.fetchProducts()
+    }
+  } catch (e) {
+    console.error('Failed to fetch products before loading ratings', e)
+  }
+
+  // Now load ratings (if product is available)
+  await loadRatings()
+})
 
 const goBack = () => {
   router.back()

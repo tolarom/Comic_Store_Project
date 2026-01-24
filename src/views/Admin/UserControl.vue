@@ -148,6 +148,12 @@
       </div>
 
       <!-- Users Table -->
+      <div v-if="lastApiError" class="mb-4">
+        <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+          <strong class="font-semibold">API Error:</strong>
+          <span class="block text-sm">{{ lastApiError }}</span>
+        </div>
+      </div>
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
@@ -201,7 +207,6 @@
                     </div>
                     <div>
                       <div class="font-medium text-gray-900">{{ user.name }}</div>
-                      <div class="text-sm text-gray-500">ID: {{ user.id }}</div>
                     </div>
                   </div>
                 </td>
@@ -293,9 +298,14 @@
 </template>
 
 <script>
-import { ref, computed, defineComponent } from 'vue'
+import { ref, computed, defineComponent, onMounted } from 'vue'
 import Header from '../../components/Admin/NavigationBar.vue'
-import { useUsersStore } from '@/data/users'
+import {
+  getAllUsers as apiGetAllUsers,
+  register as apiRegister,
+  updateUser as apiUpdateUser,
+  deleteUser as apiDeleteUser,
+} from '@/services/api'
 
 // UserModal Component
 const UserModal = defineComponent({
@@ -676,7 +686,69 @@ export default {
     Header,
   },
   setup() {
-    const usersStore = useUsersStore()
+    const users = ref([])
+    const loading = ref(false)
+    const error = ref(null)
+    const lastApiError = ref(null)
+
+    const normalizeId = (raw) => {
+      if (!raw) return null
+      if (typeof raw === 'string') return raw
+      if (typeof raw === 'object') {
+        if (raw.$oid) return raw.$oid
+        if (raw['$oid']) return raw['$oid']
+        if (raw.id) return raw.id
+        try {
+          return String(raw)
+        } catch {
+          return null
+        }
+      }
+      return String(raw)
+    }
+
+    const formatApiError = (e) => {
+      try {
+        if (!e) return 'Unknown error'
+        if (e.response) {
+          const status = e.response.status
+          const data = e.response.data
+          return `HTTP ${status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`
+        }
+        return e.message || String(e)
+      } catch (err) {
+        return String(err)
+      }
+    }
+
+    const loadUsers = async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const resp = await apiGetAllUsers()
+        // normalize backend users into expected UI fields
+        users.value = (resp || []).map((u, idx) => ({
+          id: idx + 1,
+          backend_id: normalizeId(u._id) || normalizeId(u.id) || null,
+          name: u.full_name || u.username || 'Unknown',
+          email: u.email || '',
+          role: (u.role && (u.role === 'admin' || u.role === 'Admin')) ? 'Admin' : 'Customer',
+          status: u.status || 'Active',
+          phone: u.phone || '',
+          address: u.address || '',
+          joinedDate: u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : (u.joinedDate || new Date().toISOString().split('T')[0]),
+        }))
+      } catch (e) {
+        console.error('Failed to load users from API', e)
+        error.value = e
+      } finally {
+        loading.value = false
+      }
+    }
+
+    onMounted(() => {
+      void loadUsers()
+    })
     const searchQuery = ref('')
     const selectedRole = ref('All Roles')
     const selectedStatus = ref('All Status')
@@ -688,7 +760,7 @@ export default {
     const statuses = ref(['All Status', 'Active', 'Blocked'])
 
     const filteredUsers = computed(() => {
-      let filtered = usersStore.users
+      let filtered = users.value
 
       // Filter by role
       if (selectedRole.value !== 'All Roles') {
@@ -714,11 +786,9 @@ export default {
       return filtered
     })
 
-    const activeUsers = computed(() => usersStore.users.filter((u) => u.status === 'Active').length)
-    const adminUsers = computed(() => usersStore.users.filter((u) => u.role === 'Admin').length)
-    const blockedUsers = computed(
-      () => usersStore.users.filter((u) => u.status === 'Blocked').length,
-    )
+    const activeUsers = computed(() => users.value.filter((u) => u.status === 'Active').length)
+    const adminUsers = computed(() => users.value.filter((u) => u.role === 'Admin').length)
+    const blockedUsers = computed(() => users.value.filter((u) => u.status === 'Blocked').length)
 
     const toggleRoleDropdown = () => {
       showRoleDropdown.value = !showRoleDropdown.value
@@ -748,29 +818,144 @@ export default {
       modalState.value = { isOpen: false, mode: null, user: null }
     }
 
-    const handleSaveUser = (userData) => {
-      if (modalState.value.mode === 'add') {
-        usersStore.addUser(userData)
-      } else if (modalState.value.mode === 'edit') {
-        usersStore.updateUser(userData.id, userData)
+    const handleSaveUser = async (userData) => {
+      try {
+        if (modalState.value.mode === 'add') {
+          // map UI fields to backend create user fields
+          const payload = {
+            username: (userData.email || '').split('@')[0],
+            email: userData.email,
+            password: userData.password || 'ChangeMe123!',
+            full_name: userData.name,
+            address: userData.address || '',
+            phone: userData.phone || '',
+            role: userData.role && userData.role === 'Admin' ? 'admin' : 'customer',
+          }
+          try {
+            await apiRegister(payload)
+            await loadUsers()
+          } catch (e) {
+            // fallback: add locally so UI reflects change
+            console.warn('API create failed, falling back to local add', e)
+            const newId = users.value.length ? Math.max(...users.value.map((u) => u.id)) + 1 : 1
+            users.value.push({
+              id: newId,
+              backend_id: null,
+              name: payload.full_name,
+              email: payload.email,
+              role: payload.role === 'admin' ? 'Admin' : 'Customer',
+              status: 'Active',
+              phone: payload.phone,
+              address: payload.address,
+              joinedDate: new Date().toISOString().split('T')[0],
+            })
+          }
+        } else if (modalState.value.mode === 'edit') {
+          // update backend user by backend_id
+          const backendId = normalizeId(userData.backend_id)
+          const updates = {
+            full_name: userData.name,
+            email: userData.email,
+            address: userData.address,
+            phone: userData.phone,
+            role: userData.role && userData.role === 'Admin' ? 'admin' : 'customer',
+          }
+
+          if (backendId) {
+            try {
+              console.debug('API updateUser', { id: String(backendId), updates })
+              await apiUpdateUser(String(backendId), updates)
+              await loadUsers()
+            } catch (e) {
+              console.warn('API update failed, falling back to local update', e)
+              const msg = formatApiError(e)
+              console.error('updateUser error full:', e)
+              lastApiError.value = msg
+              try {
+                alert('Update failed: ' + msg)
+              } catch (err) {
+                console.error('Error showing update alert', err)
+              }
+              // fallback: update local entry
+              const idx = users.value.findIndex((u) => u.backend_id === backendId)
+              if (idx !== -1) {
+                users.value[idx] = { ...users.value[idx], ...{
+                  name: userData.name,
+                  email: userData.email,
+                  address: userData.address,
+                  phone: userData.phone,
+                  role: userData.role === 'Admin' ? 'Admin' : 'Customer',
+                }}
+              }
+            }
+          } else {
+            // no backend id - just update locally
+            const idx = users.value.findIndex((u) => u.id === userData.id)
+            if (idx !== -1) {
+              users.value[idx] = { ...users.value[idx], ...{
+                name: userData.name,
+                email: userData.email,
+                address: userData.address,
+                phone: userData.phone,
+                role: userData.role === 'Admin' ? 'Admin' : 'Customer',
+              }}
+            }
+          }
+        }
+
+        // close modal
+        closeModal()
+      } catch (e) {
+        console.error('Failed to save user', e)
+        alert('Failed to save user')
       }
-      closeModal()
     }
 
-    const toggleUserStatus = (user) => {
+    const toggleUserStatus = async (user) => {
       const newStatus = user.status === 'Active' ? 'Blocked' : 'Active'
       const action = newStatus === 'Blocked' ? 'block' : 'activate'
 
-      if (confirm(`Are you sure you want to ${action} "${user.name}"?`)) {
-        usersStore.toggleUserStatus(user.id)
+      if (!confirm(`Are you sure you want to ${action} "${user.name}"?`)) return
+
+      try {
+        const backendId = normalizeId(user.backend_id)
+        if (!backendId) throw new Error('Missing backend id')
+        const payload = { status: newStatus }
+        console.debug('API updateUser status', { id: backendId, payload })
+        await apiUpdateUser(String(backendId), payload)
+        await loadUsers()
+      } catch (e) {
+        console.error('Failed to toggle user status', e)
+        const msg = formatApiError(e)
+        lastApiError.value = msg
+        try {
+          console.error('toggleUserStatus error full:', e)
+          alert('Failed to change user status: ' + msg)
+        } catch (err) {
+          console.error('Error showing toggle status alert', err)
+        }
       }
     }
 
-    const deleteUser = (user) => {
-      if (
-        confirm(`Are you sure you want to delete "${user.name}"? This action cannot be undone.`)
-      ) {
-        usersStore.deleteUser(user.id)
+    const deleteUser = async (user) => {
+      if (!confirm(`Are you sure you want to delete "${user.name}"? This action cannot be undone.`)) return
+      try {
+        const backendId = normalizeId(user.backend_id)
+        if (!backendId) throw new Error('Missing backend id')
+        console.debug('API deleteUser', { id: backendId })
+        await apiDeleteUser(String(backendId))
+        // refresh
+        await loadUsers()
+      } catch (e) {
+        console.error('Failed to delete user', e)
+        const msg = formatApiError(e)
+        lastApiError.value = msg
+        try {
+          console.error('deleteUser error full:', e)
+          alert('Failed to delete user: ' + msg)
+        } catch (err) {
+          console.error('Error showing delete alert', err)
+        }
       }
     }
 
@@ -801,7 +986,7 @@ export default {
       showStatusDropdown,
       roles,
       statuses,
-      users: computed(() => usersStore.users),
+      users: computed(() => users.value),
       filteredUsers,
       activeUsers,
       adminUsers,
@@ -818,6 +1003,9 @@ export default {
       deleteUser,
       formatDate,
       getAvatarColor,
+      loading,
+      error,
+        lastApiError,
     }
   },
 }

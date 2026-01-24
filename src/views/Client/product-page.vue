@@ -19,10 +19,9 @@
             :disabled="loading"
           >
             <option value="all">All Categories</option>
-            <option value="comics">Comics</option>
-            <option value="manga">Manga</option>
-            <option value="graphic-novels">Graphic Novels</option>
-            <option value="merchandise">Merchandise</option>
+            <option v-for="(c, i) in categories" :key="i" :value="c.name.toLowerCase()">
+              {{ c.name }}
+            </option>
           </select>
         </div>
 
@@ -128,6 +127,8 @@ import { useProductsStore, type ProductItem } from '@/data/products'
 import { useCartStore } from '@/stores/cart'
 import { useSearch } from '@/composables/useSearch'
 import { useRoute, useRouter } from 'vue-router'
+import { getProductsByCategory, getAllCategories } from '@/services/api'
+import type { Category as ApiCategory } from '@/services/api'
 
 const cartStore = useCartStore()
 const { searchQuery } = useSearch()
@@ -142,6 +143,23 @@ const error = ref<string | null>(null)
 
 // Exposed for template
 const backendUrl = computed(() => import.meta.env.VITE_API_URL || 'http://localhost:8080')
+
+// Local products fetched directly for a selected category
+const apiProducts = ref<ProductItem[]>([])
+
+// Categories for the select dropdown (keep full objects)
+const categories = ref<ApiCategory[]>([])
+
+// Load categories for the filter select
+async function loadCategories() {
+  try {
+    const cats = await getAllCategories()
+    categories.value = cats || []
+  } catch (e) {
+    console.error('Failed to load categories for select', e)
+    categories.value = []
+  }
+}
 
 // Fetch products from store
 onMounted(async () => {
@@ -162,12 +180,15 @@ onMounted(async () => {
     error.value = err instanceof Error ? err.message : 'Failed to load products'
     loading.value = false
   }
+  
+  // Load categories for dropdown
+  loadCategories()
 })
 
 // Alias for template
-const products = computed(() => productsStore.products)
-
-const productQuantity = computed(() => products.value.length)
+const products = computed(() => {
+  return selectedCategory.value === 'all' ? productsStore.products : apiProducts.value
+})
 
 const sortOption = ref<'default' | 'price-low' | 'price-high' | 'alpha-asc' | 'alpha-desc'>(
   'default',
@@ -183,21 +204,18 @@ watch([searchQuery, selectedCategory], () => {
   currentPage.value = 1
 })
 
-// Initialize category from query param (e.g., /client/products?category=manga)
-onMounted(() => {
-  const cat = route.query.category
-  if (typeof cat === 'string' && cat.trim().length > 0) {
-    selectedCategory.value = cat.toLowerCase()
-  }
-})
+
 
 // Keep URL in sync when user changes category via dropdown
 watch(selectedCategory, (cat) => {
   const newQuery: Record<string, any> = { ...route.query }
   if (cat === 'all') {
     delete newQuery.category
+    apiProducts.value = []
   } else {
     newQuery.category = cat
+    // fetch products for this category from backend
+    fetchProductsForCategory(cat)
   }
   router.replace({ query: newQuery })
 })
@@ -216,13 +234,6 @@ watch(
 const sortedProducts = computed<ProductItem[]>(() => {
   let productsCopy = [...products.value]
 
-  if (selectedCategory.value !== 'all') {
-    productsCopy = productsCopy.filter(
-      (product) => product.category?.toLowerCase() === selectedCategory.value,
-    )
-  }
-
-  // Filter by
   // Filter by search query
   if (searchQuery.value && searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase()
@@ -253,7 +264,7 @@ const totalPages = computed(() => Math.ceil(sortedProducts.value.length / itemsP
 
 const productCountDisplay = computed(() => {
   const filtered = sortedProducts.value.length
-  const total = productQuantity.value
+  const total = products.value.length
 
   if (searchQuery.value && searchQuery.value.trim()) {
     return `Showing ${filtered} of ${total} products (filtered)`
@@ -309,6 +320,7 @@ const addToCart = (product: ProductItem) => {
 
   cartStore.addToCart({
     id: product.id,
+    backend_id: product.backend_id,
     name: product.title,
     price: discountedPrice,
     image: product.image,
@@ -329,6 +341,40 @@ const reloadProducts = async () => {
     loading.value = false
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Error loading products'
+    loading.value = false
+  }
+}
+
+// Fetch products directly from API for a category and map to ProductItem
+async function fetchProductsForCategory(cat: string) {
+  if (!cat || cat === 'all') {
+    apiProducts.value = []
+    return
+  }
+  loading.value = true
+  error.value = null
+  try {
+    const backend = await getProductsByCategory(cat)
+    // map backend Product -> ProductItem similar to store
+    apiProducts.value = backend.map((p: any, idx: number) => ({
+      id: idx + 1,
+      title: p.title || 'Untitled',
+      subtitle: p.category || 'Product',
+      description: p.description || '',
+      price: p.price || 0,
+      discount: 0,
+      rating: 0,
+      reviewCount: 0,
+      image: p.image_url || '',
+      category: p.category || '',
+      stock: p.stock || 0,
+      sales: 0,
+    }))
+    loading.value = false
+  } catch (e) {
+    console.error('Failed to fetch products for category', cat, e)
+    error.value = 'Failed to load category products'
+    apiProducts.value = []
     loading.value = false
   }
 }

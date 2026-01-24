@@ -1,6 +1,5 @@
-**main.rs**
-```rust
 use actix_web::{web, App, HttpResponse, HttpServer, middleware};
+use actix_cors::Cors;
 use chrono::{DateTime, Utc};
 use futures::stream::TryStreamExt;
 use log::info;
@@ -22,6 +21,8 @@ pub struct Product {
     pub title: String,
     pub description: String,
     pub price: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discount: Option<f64>,
     pub category: String,
     pub stock: i32,
     pub image_url: String,
@@ -39,8 +40,14 @@ pub struct User {
     pub full_name: String,
     pub address: String,
     pub phone: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
     #[serde(default = "default_role")]
     pub role: String, // "admin" or "customer", defaults to "customer"
+    #[serde(default = "default_country")]
+    pub country: String,
+    #[serde(default = "default_gender")]
+    pub gender: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -52,6 +59,7 @@ pub struct Order {
     pub user_id: String,
     pub products: Vec<OrderItem>,
     pub total_price: f64,
+    pub order_type: String,
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -76,11 +84,53 @@ pub struct Rating {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Category {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Group {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiResponse<T> {
     pub success: bool,
     pub message: String,
     pub data: Option<T>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CartItem {
+    pub product_id: String,
+    pub quantity: i32,
+    pub price: f64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Cart {
+    #[serde(rename = "_id", skip_serializing_if = "Option::is_none")]
+    pub id: Option<ObjectId>,
+    pub user_id: String,
+    pub items: Vec<CartItem>,
+    pub total_price: f64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 // ============================================================
@@ -95,6 +145,8 @@ pub struct CreateProductRequest {
     pub category: String,
     pub stock: i32,
     pub image_url: String,
+    #[serde(default)]
+    pub discount: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -105,12 +157,41 @@ pub struct CreateUserRequest {
     pub full_name: String,
     pub address: String,
     pub phone: String,
+    #[serde(default)]
+    pub image_url: Option<String>,
     #[serde(default = "default_role")]
     pub role: String, // "admin" or "customer", defaults to "customer"
+    #[serde(default = "default_country")]
+    pub country: String,
+    #[serde(default = "default_gender")]
+    pub gender: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateUserRequest {
+    pub username: Option<String>,
+    pub email: Option<String>,
+    pub password: Option<String>,
+    pub full_name: Option<String>,
+    pub address: Option<String>,
+    pub phone: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+    pub role: Option<String>,
+    pub country: Option<String>,
+    pub gender: Option<String>,
 }
 
 fn default_role() -> String {
     "customer".to_string()
+}
+
+fn default_country() -> String {
+    "Unknown".to_string()
+}
+
+fn default_gender() -> String {
+    "other".to_string()
 }
 
 #[derive(Deserialize)]
@@ -118,6 +199,15 @@ pub struct CreateOrderRequest {
     pub user_id: String,
     pub products: Vec<OrderItem>,
     pub total_price: f64,
+    pub order_type: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateOrderRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub order_type: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -136,6 +226,31 @@ pub struct UpdateProductRequest {
     pub category: Option<String>,
     pub stock: Option<i32>,
     pub image_url: Option<String>,
+    pub discount: Option<f64>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCategoryRequest {
+    pub name: String,
+    pub group_id: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateGroupRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateCartItemRequest {
+    pub product_id: String,
+    pub quantity: i32,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateCartItemRequest {
+    pub quantity: i32,
 }
 
 // ============================================================
@@ -234,6 +349,7 @@ async fn create_product(
         title: req.title.clone(),
         description: req.description.clone(),
         price: req.price,
+        discount: req.discount,
         category: req.category.clone(),
         stock: req.stock,
         image_url: req.image_url.clone(),
@@ -281,6 +397,9 @@ async fn update_product(
             }
             if let Some(price) = req.price {
                 update_doc.insert("price", price);
+            }
+            if let Some(discount) = req.discount {
+                update_doc.insert("discount", discount);
             }
             if let Some(category) = &req.category {
                 update_doc.insert("category", category.clone());
@@ -444,7 +563,10 @@ async fn create_user(
         full_name: req.full_name.clone(),
         address: req.address.clone(),
         phone: req.phone.clone(),
+        image_url: req.image_url.clone(),
         role: req.role.clone(),
+        country: req.country.clone(),
+        gender: req.gender.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -462,6 +584,87 @@ async fn create_user(
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<User> {
             success: false,
             message: format!("Error creating user: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn update_user(
+    data: web::Data<AppState>,
+    id: web::Path<String>,
+    req: web::Json<UpdateUserRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => {
+            let mut update_doc = doc! {};
+
+            if let Some(username) = &req.username {
+                update_doc.insert("username", username.clone());
+            }
+            if let Some(email) = &req.email {
+                update_doc.insert("email", email.clone());
+            }
+            if let Some(password) = &req.password {
+                update_doc.insert("password", password.clone());
+            }
+            if let Some(full_name) = &req.full_name {
+                update_doc.insert("full_name", full_name.clone());
+            }
+            if let Some(address) = &req.address {
+                update_doc.insert("address", address.clone());
+            }
+            if let Some(phone) = &req.phone {
+                update_doc.insert("phone", phone.clone());
+            }
+            if let Some(image_url) = &req.image_url {
+                update_doc.insert("image_url", image_url.clone());
+            }
+            if let Some(role) = &req.role {
+                update_doc.insert("role", role.clone());
+            }
+            if let Some(country) = &req.country {
+                update_doc.insert("country", country.clone());
+            }
+            if let Some(gender) = &req.gender {
+                update_doc.insert("gender", gender.clone());
+            }
+
+            update_doc.insert("updated_at", to_bson(&Utc::now()).unwrap());
+
+            match collection
+                .update_one(doc! { "_id": object_id }, doc! { "$set": update_doc }, None)
+                .await
+            {
+                Ok(result) => {
+                    if result.matched_count == 0 {
+                        HttpResponse::NotFound().json(ApiResponse::<String> {
+                            success: false,
+                            message: "User not found".to_string(),
+                            data: None,
+                        })
+                    } else {
+                        HttpResponse::Ok().json(ApiResponse {
+                            success: true,
+                            message: "User updated successfully".to_string(),
+                            data: Some("User updated".to_string()),
+                        })
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error updating user: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid user ID".to_string(),
             data: None,
         }),
     }
@@ -575,11 +778,22 @@ async fn create_order(
         .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
     let collection = db.collection::<Order>("orders");
 
+    // validate order_type
+    let order_type = req.order_type.to_lowercase();
+    if order_type != "shipping" && order_type != "pickup" {
+        return HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "order_type must be 'shipping' or 'pickup'".to_string(),
+            data: None,
+        });
+    }
+
     let order = Order {
         id: None,
         user_id: req.user_id.clone(),
         products: req.products.clone(),
         total_price: req.total_price,
+        order_type: order_type.clone(),
         status: "pending".to_string(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
@@ -589,11 +803,28 @@ async fn create_order(
         Ok(result) => {
             let mut created_order = order;
             created_order.id = result.inserted_id.as_object_id();
-            HttpResponse::Created().json(ApiResponse {
-                success: true,
-                message: "Order created successfully".to_string(),
-                data: Some(created_order),
-            })
+
+            // attempt to clear the user's cart
+            let carts = db.collection::<Cart>("carts");
+            match carts.delete_one(doc! { "user_id": &created_order.user_id }, None).await {
+                Ok(res) => {
+                    let msg = if res.deleted_count > 0 {
+                        "Order created successfully and cart cleared".to_string()
+                    } else {
+                        "Order created successfully (no cart to clear)".to_string()
+                    };
+                    HttpResponse::Created().json(ApiResponse {
+                        success: true,
+                        message: msg,
+                        data: Some(created_order),
+                    })
+                }
+                Err(e) => HttpResponse::Created().json(ApiResponse {
+                    success: true,
+                    message: format!("Order created but failed to clear cart: {}", e),
+                    data: Some(created_order),
+                }),
+            }
         }
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Order> {
             success: false,
@@ -785,6 +1016,660 @@ async fn delete_rating(data: web::Data<AppState>, id: web::Path<String>) -> Http
 }
 
 // ============================================================
+// CATEGORY HANDLERS
+// ============================================================
+
+async fn get_all_categories(data: web::Data<AppState>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Category>("categories");
+
+    match collection.find(None, None).await {
+        Ok(mut cursor) => {
+            let mut items = Vec::new();
+            while let Ok(Some(item)) = cursor.try_next().await {
+                items.push(item);
+            }
+            HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                message: "Categories retrieved successfully".to_string(),
+                data: Some(items),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Vec<Category>> {
+            success: false,
+            message: format!("Error retrieving categories: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn get_category_by_id(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Category>("categories");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => match collection.find_one(doc! { "_id": object_id }, None).await {
+            Ok(Some(item)) => HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                message: "Category retrieved successfully".to_string(),
+                data: Some(item),
+            }),
+            Ok(None) => HttpResponse::NotFound().json(ApiResponse::<Category> {
+                success: false,
+                message: "Category not found".to_string(),
+                data: None,
+            }),
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Category> {
+                success: false,
+                message: format!("Error retrieving category: {}", e),
+                data: None,
+            }),
+        },
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<Category> {
+            success: false,
+            message: "Invalid category ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+async fn create_category(
+    data: web::Data<AppState>,
+    req: web::Json<CreateCategoryRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Category>("categories");
+
+    let category = Category {
+        id: None,
+        name: req.name.clone(),
+        group_id: req.group_id.clone(),
+        description: req.description.clone(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    match collection.insert_one(&category, None).await {
+        Ok(result) => {
+            let mut created = category;
+            created.id = result.inserted_id.as_object_id();
+            HttpResponse::Created().json(ApiResponse {
+                success: true,
+                message: "Category created successfully".to_string(),
+                data: Some(created),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Category> {
+            success: false,
+            message: format!("Error creating category: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn delete_category(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Category>("categories");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => match collection.delete_one(doc! { "_id": object_id }, None).await {
+            Ok(result) => {
+                if result.deleted_count == 0 {
+                    HttpResponse::NotFound().json(ApiResponse::<String> {
+                        success: false,
+                        message: "Category not found".to_string(),
+                        data: None,
+                    })
+                } else {
+                    HttpResponse::Ok().json(ApiResponse {
+                        success: true,
+                        message: "Category deleted successfully".to_string(),
+                        data: Some("Category deleted".to_string()),
+                    })
+                }
+            }
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                success: false,
+                message: format!("Error deleting category: {}", e),
+                data: None,
+            }),
+        },
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid category ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+// ============================================================
+// GROUP HANDLERS
+// ============================================================
+
+async fn get_all_groups(data: web::Data<AppState>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Group>("groups");
+
+    match collection.find(None, None).await {
+        Ok(mut cursor) => {
+            let mut items = Vec::new();
+            while let Ok(Some(item)) = cursor.try_next().await {
+                items.push(item);
+            }
+            HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                message: "Groups retrieved successfully".to_string(),
+                data: Some(items),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Vec<Group>> {
+            success: false,
+            message: format!("Error retrieving groups: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn get_group_by_id(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Group>("groups");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => match collection.find_one(doc! { "_id": object_id }, None).await {
+            Ok(Some(item)) => HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                message: "Group retrieved successfully".to_string(),
+                data: Some(item),
+            }),
+            Ok(None) => HttpResponse::NotFound().json(ApiResponse::<Group> {
+                success: false,
+                message: "Group not found".to_string(),
+                data: None,
+            }),
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Group> {
+                success: false,
+                message: format!("Error retrieving group: {}", e),
+                data: None,
+            }),
+        },
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<Group> {
+            success: false,
+            message: "Invalid group ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+async fn create_group(
+    data: web::Data<AppState>,
+    req: web::Json<CreateGroupRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Group>("groups");
+
+    let group = Group {
+        id: None,
+        name: req.name.clone(),
+        description: req.description.clone(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    match collection.insert_one(&group, None).await {
+        Ok(result) => {
+            let mut created = group;
+            created.id = result.inserted_id.as_object_id();
+            HttpResponse::Created().json(ApiResponse {
+                success: true,
+                message: "Group created successfully".to_string(),
+                data: Some(created),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Group> {
+            success: false,
+            message: format!("Error creating group: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn delete_group(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Group>("groups");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => match collection.delete_one(doc! { "_id": object_id }, None).await {
+            Ok(result) => {
+                if result.deleted_count == 0 {
+                    HttpResponse::NotFound().json(ApiResponse::<String> {
+                        success: false,
+                        message: "Group not found".to_string(),
+                        data: None,
+                    })
+                } else {
+                    HttpResponse::Ok().json(ApiResponse {
+                        success: true,
+                        message: "Group deleted successfully".to_string(),
+                        data: Some("Group deleted".to_string()),
+                    })
+                }
+            }
+            Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                success: false,
+                message: format!("Error deleting group: {}", e),
+                data: None,
+            }),
+        },
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid group ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+// ============================================================
+// CART HANDLERS
+// ============================================================
+
+async fn get_cart(data: web::Data<AppState>, user_id: web::Path<String>) -> HttpResponse {
+    let user = user_id.into_inner();
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Cart>("carts");
+
+    match collection.find_one(doc! { "user_id": &user }, None).await {
+        Ok(Some(cart)) => HttpResponse::Ok().json(ApiResponse {
+            success: true,
+            message: "Cart retrieved successfully".to_string(),
+            data: Some(cart),
+        }),
+        Ok(None) => {
+            let empty = Cart {
+                id: None,
+                user_id: user,
+                items: Vec::new(),
+                total_price: 0.0,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+            HttpResponse::Ok().json(ApiResponse {
+                success: true,
+                message: "Cart is empty".to_string(),
+                data: Some(empty),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+            success: false,
+            message: format!("Error retrieving cart: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn add_item_to_cart(
+    data: web::Data<AppState>,
+    user_id: web::Path<String>,
+    req: web::Json<CreateCartItemRequest>,
+) -> HttpResponse {
+    let user = user_id.into_inner();
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+
+    // get product price
+    let products = db.collection::<Product>("products");
+    let product_oid = match ObjectId::parse_str(&req.product_id) {
+        Ok(oid) => oid,
+        Err(_) => {
+            return HttpResponse::BadRequest().json(ApiResponse::<String> {
+                success: false,
+                message: "Invalid product ID".to_string(),
+                data: None,
+            })
+        }
+    };
+
+    let product = match products.find_one(doc! { "_id": product_oid }, None).await {
+        Ok(Some(p)) => p,
+        Ok(None) => {
+            return HttpResponse::BadRequest().json(ApiResponse::<String> {
+                success: false,
+                message: "Product not found".to_string(),
+                data: None,
+            })
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                success: false,
+                message: format!("Error fetching product: {}", e),
+                data: None,
+            })
+        }
+    };
+
+    let mut price = product.price;
+    if let Some(dp) = product.discount {
+        price = price * (1.0 - dp / 100.0);
+    }
+
+    let carts = db.collection::<Cart>("carts");
+
+    match carts.find_one(doc! { "user_id": &user }, None).await {
+        Ok(Some(mut cart)) => {
+            let mut found = false;
+            for item in cart.items.iter_mut() {
+                if item.product_id == req.product_id {
+                    item.quantity += req.quantity;
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                cart.items.push(CartItem {
+                    product_id: req.product_id.clone(),
+                    quantity: req.quantity,
+                    price,
+                });
+            }
+
+            let total: f64 = cart
+                .items
+                .iter()
+                .map(|i| i.price * (i.quantity as f64))
+                .sum();
+
+            cart.updated_at = Utc::now();
+            cart.total_price = total;
+
+            match carts
+                .update_one(
+                    doc! { "user_id": &cart.user_id },
+                    doc! {
+                        "$set": {
+                            "items": to_bson(&cart.items).unwrap(),
+                            "total_price": cart.total_price,
+                            "updated_at": to_bson(&cart.updated_at).unwrap()
+                        }
+                    },
+                    None,
+                )
+                .await
+            {
+                Ok(_) => HttpResponse::Ok().json(ApiResponse {
+                    success: true,
+                    message: "Cart updated successfully".to_string(),
+                    data: Some(cart),
+                }),
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+                    success: false,
+                    message: format!("Error updating cart: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Ok(None) => {
+            let new_cart = Cart {
+                id: None,
+                user_id: user.clone(),
+                items: vec![CartItem {
+                    product_id: req.product_id.clone(),
+                    quantity: req.quantity,
+                    price,
+                }],
+                total_price: price * (req.quantity as f64),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            };
+
+            match carts.insert_one(&new_cart, None).await {
+                Ok(result) => {
+                    let mut created = new_cart;
+                    created.id = result.inserted_id.as_object_id();
+                    HttpResponse::Created().json(ApiResponse {
+                        success: true,
+                        message: "Cart created and item added".to_string(),
+                        data: Some(created),
+                    })
+                }
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+                    success: false,
+                    message: format!("Error creating cart: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+            success: false,
+            message: format!("Error accessing cart: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn update_cart_item(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+    req: web::Json<UpdateCartItemRequest>,
+) -> HttpResponse {
+    let (user, product_id) = path.into_inner();
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let carts = db.collection::<Cart>("carts");
+
+    match carts.find_one(doc! { "user_id": &user }, None).await {
+        Ok(Some(mut cart)) => {
+            let mut found = false;
+            cart.items.retain(|item| {
+                if item.product_id == product_id {
+                    found = true;
+                    // will be removed if quantity <= 0
+                    if req.quantity <= 0 {
+                        return false;
+                    }
+                }
+                true
+            });
+
+            if found {
+                // update or push
+                let mut exists = false;
+                for item in cart.items.iter_mut() {
+                    if item.product_id == product_id {
+                        item.quantity = req.quantity;
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if !exists && req.quantity > 0 {
+                    // need price; try to look up product price
+                    let products = db.collection::<Product>("products");
+                    if let Ok(Some(p)) = products
+                        .find_one(doc! { "_id": ObjectId::parse_str(&product_id).unwrap_or(ObjectId::new()) }, None)
+                        .await
+                    {
+                        let mut item_price = p.price;
+                        if let Some(dp) = p.discount {
+                            item_price = item_price * (1.0 - dp / 100.0);
+                        }
+                        cart.items.push(CartItem {
+                            product_id: product_id.clone(),
+                            quantity: req.quantity,
+                            price: item_price,
+                        });
+                    }
+                }
+
+                let total: f64 = cart
+                    .items
+                    .iter()
+                    .map(|i| i.price * (i.quantity as f64))
+                    .sum();
+
+                cart.total_price = total;
+                cart.updated_at = Utc::now();
+
+                match carts
+                    .update_one(
+                        doc! { "user_id": &cart.user_id },
+                        doc! {
+                            "$set": {
+                                "items": to_bson(&cart.items).unwrap(),
+                                "total_price": cart.total_price,
+                                "updated_at": to_bson(&cart.updated_at).unwrap()
+                            }
+                        },
+                        None,
+                    )
+                    .await
+                {
+                    Ok(_) => HttpResponse::Ok().json(ApiResponse {
+                        success: true,
+                        message: "Cart item updated".to_string(),
+                        data: Some(cart),
+                    }),
+                    Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+                        success: false,
+                        message: format!("Error updating cart: {}", e),
+                        data: None,
+                    }),
+                }
+            } else {
+                HttpResponse::NotFound().json(ApiResponse::<String> {
+                    success: false,
+                    message: "Cart item not found".to_string(),
+                    data: None,
+                })
+            }
+        }
+        Ok(None) => HttpResponse::NotFound().json(ApiResponse::<String> {
+            success: false,
+            message: "Cart not found".to_string(),
+            data: None,
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+            success: false,
+            message: format!("Error accessing cart: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn remove_cart_item(
+    data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> HttpResponse {
+    let (user, product_id) = path.into_inner();
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let carts = db.collection::<Cart>("carts");
+
+    match carts.find_one(doc! { "user_id": &user }, None).await {
+        Ok(Some(mut cart)) => {
+            let before = cart.items.len();
+            cart.items.retain(|item| item.product_id != product_id);
+            if cart.items.len() == before {
+                return HttpResponse::NotFound().json(ApiResponse::<String> {
+                    success: false,
+                    message: "Item not found in cart".to_string(),
+                    data: None,
+                });
+            }
+
+            cart.total_price = cart.items.iter().map(|i| i.price * (i.quantity as f64)).sum();
+            cart.updated_at = Utc::now();
+
+            match carts
+                .update_one(
+                    doc! { "user_id": &cart.user_id },
+                    doc! {
+                        "$set": {
+                            "items": to_bson(&cart.items).unwrap(),
+                            "total_price": cart.total_price,
+                            "updated_at": to_bson(&cart.updated_at).unwrap()
+                        }
+                    },
+                    None,
+                )
+                .await
+            {
+                Ok(_) => HttpResponse::Ok().json(ApiResponse {
+                    success: true,
+                    message: "Item removed from cart".to_string(),
+                    data: Some(cart),
+                }),
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+                    success: false,
+                    message: format!("Error updating cart: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Ok(None) => HttpResponse::NotFound().json(ApiResponse::<String> {
+            success: false,
+            message: "Cart not found".to_string(),
+            data: None,
+        }),
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Cart> {
+            success: false,
+            message: format!("Error accessing cart: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn clear_cart(data: web::Data<AppState>, user_id: web::Path<String>) -> HttpResponse {
+    let user = user_id.into_inner();
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let carts = db.collection::<Cart>("carts");
+
+    match carts.delete_one(doc! { "user_id": &user }, None).await {
+        Ok(res) => {
+            if res.deleted_count == 0 {
+                HttpResponse::NotFound().json(ApiResponse::<String> {
+                    success: false,
+                    message: "Cart not found".to_string(),
+                    data: None,
+                })
+            } else {
+                HttpResponse::Ok().json(ApiResponse::<String> {
+                    success: true,
+                    message: "Cart cleared".to_string(),
+                    data: None,
+                })
+            }
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+            success: false,
+            message: format!("Error clearing cart: {}", e),
+            data: None,
+        }),
+    }
+}
+
+// ============================================================
 // MAIN APPLICATION
 // ============================================================
 
@@ -838,6 +1723,12 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(app_state.clone())
+            .wrap(
+                Cors::default()
+                    .allow_any_origin()
+                    .allow_any_method()
+                    .allow_any_header()
+            )
             .wrap(middleware::Logger::default())
             .route("/health", web::get().to(health))
             .route("/api/products", web::get().to(get_all_products))
@@ -847,6 +1738,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/products/{id}", web::delete().to(delete_product))
             .route("/api/users", web::get().to(get_all_users))
             .route("/api/users/{id}", web::get().to(get_user_by_id))
+            .route("/api/users/{id}", web::put().to(update_user))
             .route("/api/users", web::post().to(create_user))
             .route("/api/users/{id}", web::delete().to(delete_user))
             .route("/api/orders", web::get().to(get_all_orders))
@@ -860,42 +1752,21 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/api/ratings", web::post().to(create_rating))
             .route("/api/ratings/{id}", web::delete().to(delete_rating))
+            .route("/api/categories", web::get().to(get_all_categories))
+            .route("/api/categories/{id}", web::get().to(get_category_by_id))
+            .route("/api/categories", web::post().to(create_category))
+            .route("/api/categories/{id}", web::delete().to(delete_category))
+            .route("/api/groups", web::get().to(get_all_groups))
+            .route("/api/groups/{id}", web::get().to(get_group_by_id))
+            .route("/api/groups", web::post().to(create_group))
+            .route("/api/groups/{id}", web::delete().to(delete_group))
+            .route("/api/carts/{user_id}", web::get().to(get_cart))
+            .route("/api/carts/{user_id}/items", web::post().to(add_item_to_cart))
+            .route("/api/carts/{user_id}/items/{product_id}", web::put().to(update_cart_item))
+            .route("/api/carts/{user_id}/items/{product_id}", web::delete().to(remove_cart_item))
+            .route("/api/carts/{user_id}", web::delete().to(clear_cart))
     })
     .bind(&bind_address)?
     .run()
     .await
 }
-```
-
-.env
-```env
-MONGODB_URI=mongodb://localhost:27017
-DATABASE_NAME=comic_store
-SERVER_ADDRESS=127.0.0.1
-SERVER_PORT=8080
-LOG_LEVEL=info
-```
-
-cargo.toml
-```toml
-[package]
-name = "comic-store-backend"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-actix-web = "4"
-actix-rt = "2"
-tokio = { version = "1", features = ["full"] }
-mongodb = { version = "2", default-features = false, features = ["tokio-runtime"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-bson = { version = "2.4", features = ["serde_with"] }
-serde_bytes = "0.11"
-chrono = { version = "0.4", features = ["serde"] }
-uuid = { version = "1.0", features = ["v4", "serde"] }
-dotenv = "0.15"
-log = "0.4"
-env_logger = "0.10"
-futures = "0.3"
-```

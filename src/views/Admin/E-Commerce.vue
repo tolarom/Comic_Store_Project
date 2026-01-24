@@ -1,5 +1,5 @@
 <template>
-  <div><Header /></div>
+  <div><NavigationBar /></div>
   <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
     <div class="mx-auto">
       <!-- Breadcrumb -->
@@ -126,6 +126,7 @@
         v-if="modalState.isOpen"
         :product="modalState.product"
         :mode="modalState.mode"
+        :categories="categories"
         @close="closeModal"
         @save="handleSaveProduct"
       />
@@ -134,7 +135,7 @@
 </template>
 
 <script>
-import { ref, computed, defineComponent } from 'vue'
+import { ref, computed, defineComponent, onMounted } from 'vue'
 import ProductCard from '../../components/Admin/ProductCard.vue'
 
 // ProductModal Component
@@ -149,6 +150,10 @@ const ProductModal = defineComponent({
       type: String,
       required: true,
     },
+    categories: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: ['close', 'save'],
   setup(props, { emit }) {
@@ -157,7 +162,6 @@ const ProductModal = defineComponent({
         ? { ...props.product }
         : {
             name: '',
-            subtitle: '',
             description: '',
             price: '',
             stock: '',
@@ -165,7 +169,8 @@ const ProductModal = defineComponent({
             rating: 0,
             reviewCount: 0,
             image: '',
-            category: 'comics',
+            category: (props.categories && props.categories.length && props.categories[0]) || 'comics',
+            discount: 0,
           },
     )
 
@@ -347,19 +352,7 @@ const ProductModal = defineComponent({
               />
             </div>
 
-            <!-- Subtitle -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Subtitle
-              </label>
-              <input
-                v-model="formData.subtitle"
-                type="text"
-                placeholder="Optional subtitle (e.g., series or edition)"
-                :disabled="isViewMode"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
+            <!-- Subtitle removed per request -->
 
             <!-- Description -->
             <div>
@@ -380,16 +373,19 @@ const ProductModal = defineComponent({
               <label class="block text-sm font-medium text-gray-700 mb-2">
                 Category
               </label>
-              <select
-                v-model="formData.category"
-                :disabled="isViewMode"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              >
-                <option value="comics">Comics</option>
-                <option value="manga">Manga</option>
-                <option value="graphic-novels">Graphic Novels</option>
-                <option value="merchandise">Merchandise</option>
-              </select>
+                <select
+                  v-model="formData.category"
+                  :disabled="isViewMode"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                >
+                  <option
+                    v-for="cat in categories"
+                    :key="cat"
+                    :value="cat"
+                  >
+                    {{ cat }}
+                  </option>
+                </select>
             </div>
 
             <!-- Price and Stock -->
@@ -422,6 +418,20 @@ const ProductModal = defineComponent({
               </div>
             </div>
 
+            <!-- Discount -->
+            <div class="mt-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Discount (%)</label>
+              <input
+                v-model.number="formData.discount"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                :disabled="isViewMode"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              />
+            </div>
+
             <!-- Sales -->
             <div v-if="mode !== 'add'">
               <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -448,18 +458,6 @@ const ProductModal = defineComponent({
                 </div>
                 <span class="text-lg font-semibold text-gray-700">{{ (formData.rating || 0).toFixed(1) }}</span>
                 <span v-if="formData.reviewCount" class="text-sm text-gray-500">({{ formData.reviewCount }} reviews)</span>
-              </div>
-              <input
-                v-if="!isViewMode"
-                v-model.number="formData.rating"
-                type="number"
-                min="0"
-                max="5"
-                step="0.1"
-                placeholder="0.0 - 5.0"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
-              />
-            </div>
           </div>
 
           <!-- Action Buttons -->
@@ -484,15 +482,21 @@ const ProductModal = defineComponent({
     </div>
   `,
 })
-import Header from '../../components/Admin/NavigationBar.vue'
-import { useProductsStore } from '@/data/products'
+import NavigationBar from '../../components/Admin/NavigationBar.vue'
+import {
+  getAllProducts as apiGetAllProducts,
+  createProduct as apiCreateProduct,
+  updateProduct as apiUpdateProduct,
+  deleteProduct as apiDeleteProduct,
+  getAllCategories as apiGetAllCategories,
+} from '@/services/api'
 
 export default {
   name: 'EcommercePage',
   components: {
     ProductCard,
     ProductModal,
-    Header,
+    NavigationBar,
   },
   setup() {
     const searchQuery = ref('')
@@ -502,31 +506,58 @@ export default {
     const currentPage = ref(1)
     const itemsPerPage = 12
 
-    const categories = ref([
-      'All Categories',
-      'comics',
-      'manga',
-      'graphic-novels',
-      'merchandise',
-    ])
+    const categories = ref(['All Categories'])
 
-    // Use products from store and map to admin format
-    const productsStore = useProductsStore()
-    const products = computed(() => 
-      productsStore.products.map(product => ({
-        id: product.id,
-        name: product.title,
-        description: product.description || product.subtitle,
-        price: product.price,
-        stock: product.stock || 0,
-        sales: product.sales || 0,
-        rating: product.rating || 0,
-        reviewCount: product.reviewCount || 0,
-        image: product.image,
-        category: product.category || 'comics',
-        subtitle: product.subtitle
-      }))
-    )
+    const products = ref([])
+
+    const normalizeId = (raw) => {
+      if (!raw) return null
+      if (typeof raw === 'string') return raw
+      if (raw.$oid) return raw.$oid
+      if (raw.toString && typeof raw.toString === 'function') return raw.toString()
+      return String(raw)
+    }
+    const loadProducts = async () => {
+      try {
+        const resp = await apiGetAllProducts()
+
+        products.value = (resp || []).map((p) => ({
+          id: normalizeId(p._id) || normalizeId(p.id),
+          name: p.title || p.name,
+          description: p.description || p.subtitle || '',
+          price: p.price || 0,
+            discount: p.discount || p.discount_percent || 0,
+          stock: p.stock || 0,
+          sales: p.sales || 0,
+          rating: p.rating || 0,
+          reviewCount: p.reviewCount || 0,
+          image: p.image_url || p.image || '',
+          category: p.category || 'comics',
+          subtitle: p.subtitle || '',
+          backend: p,
+        }))
+      } catch (e) {
+        console.error('Error loading products from API', e)
+      }
+    }
+
+    const loadCategories = async () => {
+      try {
+        const cats = await apiGetAllCategories()
+        if (Array.isArray(cats) && cats.length) {
+          const names = cats.map((c) => c.name || c.slug || c)
+          categories.value = [ ...Array.from(new Set(names))]
+        }
+      } catch (e) {
+        console.warn('Failed to load categories, using defaults', e)
+        categories.value = ['All Categories', 'comics', 'manga', 'graphic-novels', 'merchandise']
+      }
+    }
+
+    onMounted(() => {
+      loadProducts()
+      loadCategories()
+    })
 
     const filteredProducts = computed(() => {
       let filtered = products.value
@@ -541,16 +572,14 @@ export default {
         const query = searchQuery.value.toLowerCase()
         filtered = filtered.filter(
           (p) =>
-            p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query),
+            String(p.name).toLowerCase().includes(query) || String(p.description || '').toLowerCase().includes(query),
         )
       }
 
       return filtered
     })
 
-    const totalPages = computed(() => {
-      return Math.ceil(filteredProducts.value.length / itemsPerPage)
-    })
+    const totalPages = computed(() => Math.ceil(filteredProducts.value.length / itemsPerPage))
 
     const paginatedProducts = computed(() => {
       const start = (currentPage.value - 1) * itemsPerPage
@@ -569,15 +598,11 @@ export default {
     }
 
     const nextPage = () => {
-      if (currentPage.value < totalPages.value) {
-        currentPage.value++
-      }
+      if (currentPage.value < totalPages.value) currentPage.value++
     }
 
     const previousPage = () => {
-      if (currentPage.value > 1) {
-        currentPage.value--
-      }
+      if (currentPage.value > 1) currentPage.value--
     }
 
     const openModal = (mode, product = null) => {
@@ -588,100 +613,80 @@ export default {
       modalState.value = { isOpen: false, mode: null, product: null }
     }
 
-    const handleSaveProduct = (productData) => {
-      // Map admin product data back to store format
-      const newId = productData.id || Math.max(...productsStore.products.map((p) => p.id), 0) + 1
-      const existing = productsStore.products.find((p) => p.id === productData.id)
-
-      const storeProduct = {
-        id: newId,
+    const handleSaveProduct = async (productData) => {
+        const payload = {
         title: productData.name,
         description: productData.description,
-        subtitle: productData.subtitle || '',
-        price: productData.price,
-        discount: 0,
-        rating: productData.rating || 4.0,
-        reviewCount: productData.reviewCount || 0,
-        image: productData.image,
+        price: Number(productData.price) || 0,
         category: productData.category || 'comics',
-        stock: productData.stock || 0,
-        sales: productData.sales || 0
+        stock: Number(productData.stock) || 0,
+        image_url: productData.image || '',
+        discount: Number(productData.discount) || 0,
       }
-
-      if (modalState.value.mode === 'add') {
-        productsStore.products.push(storeProduct)
-      } else if (modalState.value.mode === 'edit') {
-        const index = productsStore.products.findIndex((p) => p.id === productData.id)
-        if (index !== -1) {
-          productsStore.products[index] = storeProduct
+      try {
+        if (modalState.value.mode === 'add') {
+          console.debug('[E-Commerce] POST /api/products', payload)
+          const created = await apiCreateProduct(payload)
+          products.value.unshift({
+            id: created._id || created.id,
+            name: created.title,
+            description: created.description,
+            price: created.price,
+            discount: created.discount || created.discount_percent || 0,
+            stock: created.stock,
+            image: created.image_url || '',
+            category: created.category,
+            backend: created,
+          })
+        } else if (modalState.value.mode === 'edit') {
+          const id = normalizeId(productData.id || productData._id || productData.backend?._id)
+          console.debug('[E-Commerce] PUT /api/products/' + id, {
+            title: payload.title,
+            description: payload.description,
+            price: payload.price,
+            category: payload.category,
+            stock: payload.stock,
+            image_url: payload.image_url,
+          })
+          await apiUpdateProduct(String(id), {
+            title: payload.title,
+            description: payload.description,
+            price: payload.price,
+            category: payload.category,
+            stock: payload.stock,
+            image_url: payload.image_url,
+            discount: payload.discount,
+          })
+          const idx = products.value.findIndex((p) => String(p.id) === String(id))
+          if (idx !== -1) products.value[idx] = { ...products.value[idx], ...payload }
         }
+        closeModal()
+      } catch (e) {
+        console.error('Failed to save product via API', e)
+        try {
+          if (e?.response) console.error('Server response:', e.response.data)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (__) {}
+        alert('Failed to save product. Check console for details.')
       }
-      closeModal()
     }
 
-    const deleteProduct = (product) => {
-      if (confirm(`Are you sure you want to delete "${product.name}"?`)) {
-        const index = productsStore.products.findIndex((p) => p.id === product.id)
-        if (index !== -1) {
-          productsStore.products.splice(index, 1)
-        }
+    const deleteProduct = async (product) => {
+      if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return
+      try {
+        const id = normalizeId(product.id || product._id || product.backend?._id)
+        console.debug('[E-Commerce] DELETE /api/products/' + id)
+        await apiDeleteProduct(String(id))
+        products.value = products.value.filter((p) => String(p.id) !== String(id))
+      } catch (e) {
+        console.error('Failed to delete product via API', e)
+        try {
+          if (e?.response) console.error('Server response:', e.response.data)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (__) {}
+        alert('Failed to delete product. Check console for details.')
       }
     }
-
-    // API Integration Functions (commented out for frontend-only version)
-    /*
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch('/api/products');
-        const data = await response.json();
-        products.value = data;
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      }
-    };
-
-    const createProduct = async (productData) => {
-      try {
-        const response = await fetch('/api/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(productData)
-        });
-        const newProduct = await response.json();
-        products.value.push(newProduct);
-      } catch (error) {
-        console.error('Error creating product:', error);
-      }
-    };
-
-    const updateProduct = async (id, productData) => {
-      try {
-        const response = await fetch(`/api/products/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(productData)
-        });
-        const updatedProduct = await response.json();
-        const index = products.value.findIndex(p => p.id === id);
-        if (index !== -1) {
-          products.value[index] = updatedProduct;
-        }
-      } catch (error) {
-        console.error('Error updating product:', error);
-      }
-    };
-
-    const deleteProductAPI = async (id) => {
-      try {
-        await fetch(`/api/products/${id}`, {
-          method: 'DELETE'
-        });
-        products.value = products.value.filter(p => p.id !== id);
-      } catch (error) {
-        console.error('Error deleting product:', error);
-      }
-    };
-    */
 
     return {
       searchQuery,

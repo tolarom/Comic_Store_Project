@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuth } from '@/composables/useAuth'
 
 import LoginPage from '@/views/Auth/LogIn-Page.vue'
 import SignUpPage from '@/views/Auth/SignUp-Page.vue'
@@ -23,10 +22,7 @@ const routes = [
   // Root - redirect to login or home based on auth
   {
     path: '/',
-    redirect: () => {
-      const isAuthenticated = !!localStorage.getItem('authToken')
-      return isAuthenticated ? '/client/shop' : '/loginPage'
-    },
+    redirect: '/client/shop',
   },
 
   // Authentication routes (public)
@@ -148,7 +144,7 @@ const routes = [
   // Catch-all route for 404 - MUST BE LAST
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/loginPage',
+    redirect: '/client/shop',
     meta: { title: 'Not Found' },
   },
 ]
@@ -163,38 +159,8 @@ const router = createRouter({
 
 // Route guard for authentication and authorization
 router.beforeEach((to, from, next) => {
-  const auth = useAuth()
-
-  // Initialize auth from localStorage
-  auth.initializeAuth()
-
-  // Update document title
   const title = to.meta.title ? `${to.meta.title} - Comic Store` : 'Comic Store'
   document.title = title
-
-  // Check authentication
-  const isAuthenticated = auth.isAuthenticated.value
-  const isAdmin = auth.isAdmin.value
-  const requiresAuth = to.meta.requiresAuth === true
-  const requiresAdmin = to.meta.requiresAdmin === true
-
-  // Redirect to login if accessing protected route without auth
-  if (requiresAuth && !isAuthenticated) {
-    console.warn(`Access denied to ${to.path} - redirecting to login`)
-    return next('/loginPage')
-  }
-
-  // Redirect to home if accessing admin route without admin role
-  if (requiresAdmin && isAuthenticated && !isAdmin) {
-    console.warn(`Access denied to ${to.path} - user is not admin`)
-    return next('/client/shop')
-  }
-
-  // Redirect already logged in users away from login/signup pages
-  if (isAuthenticated && (to.path === '/loginPage' || to.path === '/signUpPage')) {
-    return next('/client/shop')
-  }
-
   next()
 })
 

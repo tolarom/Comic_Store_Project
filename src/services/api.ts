@@ -31,6 +31,8 @@ export interface Product {
   title: string
   description: string
   price: number
+  // percentage (0-100)
+  discount?: number
   category: string
   stock: number
   image_url: string
@@ -45,6 +47,8 @@ export interface CreateProductRequest {
   category: string
   stock: number
   image_url: string
+  // optional percentage 0-100
+  discount?: number
 }
 
 export interface UpdateProductRequest {
@@ -54,6 +58,7 @@ export interface UpdateProductRequest {
   category?: string
   stock?: number
   image_url?: string
+  discount?: number
 }
 
 // User Types
@@ -107,6 +112,11 @@ export interface CreateOrderRequest {
   user_id: string
   products: OrderItem[]
   total_price: number
+}
+
+// Backend expects order_type: 'shipping' | 'pickup'
+export interface CreateOrderRequestWithType extends CreateOrderRequest {
+  order_type: 'shipping' | 'pickup'
 }
 
 // Rating Types
@@ -500,6 +510,96 @@ export async function getUserRatings(userId: string): Promise<Rating[]> {
   }
 }
 
+// ============================================================
+// CART API
+// ============================================================
+
+export interface CartItem {
+  product_id: string
+  quantity: number
+  price: number
+}
+
+export interface Cart {
+  _id?: string
+  id?: string
+  user_id: string
+  items: CartItem[]
+  total_price: number
+  created_at?: string
+  updated_at?: string
+}
+
+export async function getCart(userId: string): Promise<Cart> {
+  try {
+    const response = await apiClient.get<any, ApiResponse<Cart>>(`/api/carts/${userId}`)
+    if (!response.data) {
+      throw new Error('Failed to fetch cart')
+    }
+    return response.data
+  } catch (error) {
+    console.error('Error fetching cart:', error)
+    throw error
+  }
+}
+
+export async function addItemToCart(userId: string, productId: string, quantity = 1): Promise<Cart> {
+  try {
+    const response = await apiClient.post<any, ApiResponse<Cart>>(`/api/carts/${userId}/items`, {
+      product_id: productId,
+      quantity,
+    })
+    if (!response.data) {
+      throw new Error('Failed to add item to cart')
+    }
+    return response.data
+  } catch (error) {
+    console.error('Error adding item to cart:', error)
+    throw error
+  }
+}
+
+export async function updateCartItem(userId: string, productId: string, quantity: number): Promise<Cart> {
+  try {
+    const response = await apiClient.put<any, ApiResponse<Cart>>(
+      `/api/carts/${userId}/items/${productId}`,
+      { quantity },
+    )
+    if (!response.data) {
+      throw new Error('Failed to update cart item')
+    }
+    return response.data
+  } catch (error) {
+    console.error('Error updating cart item:', error)
+    throw error
+  }
+}
+
+export async function removeCartItem(userId: string, productId: string): Promise<Cart> {
+  try {
+    const response = await apiClient.delete<any, ApiResponse<Cart>>(
+      `/api/carts/${userId}/items/${productId}`,
+    )
+    if (!response.data) {
+      throw new Error('Failed to remove cart item')
+    }
+    return response.data
+  } catch (error) {
+    console.error('Error removing cart item:', error)
+    throw error
+  }
+}
+
+export async function clearCart(userId: string): Promise<{ message: string } | ApiResponse<string>> {
+  try {
+    const response = await apiClient.delete<any, ApiResponse<string>>(`/api/carts/${userId}`)
+    return response
+  } catch (error) {
+    console.error('Error clearing cart:', error)
+    throw error
+  }
+}
+
 export async function hasUserRatedProduct(productId: string, userId: string): Promise<boolean> {
   try {
     const ratings = await getRatingsByProduct(productId)
@@ -507,6 +607,81 @@ export async function hasUserRatedProduct(productId: string, userId: string): Pr
   } catch (error) {
     console.error('Error checking rating:', error)
     return false
+  }
+}
+
+// ============================================================
+// GROUP / CATEGORY API
+// ============================================================
+
+export interface Category {
+  _id?: string
+  name: string
+  slug?: string
+  group_id?: string
+}
+
+export interface Group {
+  _id?: string
+  name: string
+  slug?: string
+}
+
+export async function getAllGroups(): Promise<Group[]> {
+  try {
+    const response = await apiClient.get<any>('/api/groups')
+    // response may be ApiResponse<Group[]> or Group[] depending on backend
+    if (Array.isArray(response)) return response as Group[]
+    if (response && Array.isArray((response as unknown as ApiResponse<Group[]>).data)) {
+      return (response as unknown as ApiResponse<Group[]>).data || []
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching groups:', error)
+    throw error
+  }
+}
+
+export async function getCategoriesByGroup(groupId: string): Promise<Category[]> {
+  try {
+    // Backend doesn't provide group-specific endpoint; fetch all categories and filter
+    const resp = await apiClient.get<any>('/api/categories')
+    let categories: Category[] = []
+    if (Array.isArray(resp)) {
+      categories = resp as Category[]
+    } else if (resp && Array.isArray((resp as unknown as ApiResponse<Category[]>).data)) {
+      categories = (resp as unknown as ApiResponse<Category[]>).data || []
+    }
+
+    // Filter by groupId - handle different possible representations
+    const filtered = categories.filter((c: any) => {
+      if (!c) return false
+      if (!c.group_id) return false
+      // group_id may be stored as a string, or as an object like { "$oid": "..." }
+      if (typeof c.group_id === 'string') return c.group_id === groupId
+      if (c.group_id && typeof c.group_id === 'object') {
+        return c.group_id.$oid === groupId || String(c.group_id) === groupId
+      }
+      return false
+    })
+    return filtered
+  } catch (error) {
+    console.error('Error fetching categories for group:', error)
+    throw error
+  }
+}
+
+export async function getAllCategories(): Promise<Category[]> {
+  try {
+    const resp = await apiClient.get<any>('/api/categories')
+    if (Array.isArray(resp)) return resp as Category[]
+    if (resp && Array.isArray((resp as unknown as ApiResponse<Category[]>).data)) {
+      return (resp as unknown as ApiResponse<Category[]>).data || []
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching categories:', error)
+    throw error
   }
 }
 

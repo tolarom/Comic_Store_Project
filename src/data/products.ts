@@ -5,6 +5,7 @@ import type { Product } from '@/services/api'
 
 export interface ProductItem {
   id: number
+  backend_id?: string
   title: string
   subtitle: string
   description?: string
@@ -33,11 +34,13 @@ export const useProductsStore = defineStore('products', () => {
         // Transform backend products to local format
         products.value = backendProducts.map((p: Product, index: number) => ({
           id: index + 1,
+          backend_id: (p._id || p.id) as string,
           title: p.title || 'Untitled',
           subtitle: p.category || 'Product',
           description: p.description || '',
           price: p.price || 0,
-          discount: 0,
+          // prefer explicit `discount` field, fall back to legacy `discount_percent`
+          discount: (p as any).discount ?? (p as any).discount_percent ?? 0,
           rating: 0,
           reviewCount: 0,
           image: p.image_url || '',
@@ -59,7 +62,7 @@ export const useProductsStore = defineStore('products', () => {
   const discountedPriceById = (id: number) => {
     const p = getById(id)
     if (!p) return 0
-    return p.discount ? Number((p.price * (1 - p.discount / 100)).toFixed(2)) : p.price
+    return p.discount ? Number((p.price * (1 - p.discount / 100)).toFixed(2)) : p.price.toFixed(2)
   }
 
   return { products, fetchProducts, getById, discountedPriceById }
