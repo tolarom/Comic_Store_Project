@@ -18,7 +18,7 @@
         <div class="flex flex-col items-center">
           <div class="relative">
             <img
-              :src="fullUserData?.image_url || 'https://via.placeholder.com/300x300.png?text=Profile+Picture'"
+              :src="fullUserData?.image_url || '/images/noProfile.png'"
               alt="Profile"
               class="w-64 h-64 rounded-full object-cover border-8 border-white shadow-2xl"
             />

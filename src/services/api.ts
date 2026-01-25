@@ -703,6 +703,13 @@ export async function clearCart(userId: string): Promise<{ message: string } | A
     const response = await apiClient.delete<any, ApiResponse<string>>(`/api/carts/${userId}`)
     return response
   } catch (error) {
+    // Treat 404 (cart not found) as a successful clear — cart is already empty on backend
+    const status = (error as any)?.response?.status
+    if (status === 404) {
+      console.warn('Cart not found on backend, treating as cleared')
+      return { message: 'Cart not found' }
+    }
+
     console.error('Error clearing cart:', error)
     throw error
   }

@@ -466,19 +466,6 @@ const ProductModal = defineComponent({
               />
             </div>
 
-            <!-- Sales -->
-            <div v-if="mode !== 'add'">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Total Sales
-              </label>
-              <input
-                v-model="formData.sales"
-                type="number"
-                disabled
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
-              />
-            </div>
-
             <!-- Rating -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -610,7 +597,7 @@ export default {
         const cats = await apiGetAllCategories()
         if (Array.isArray(cats) && cats.length) {
           const names = cats.map((c) => c.name || c.slug || c)
-          categories.value = [ ...Array.from(new Set(names))]
+          categories.value = ['All Categories', ...Array.from(new Set(names))]
         }
       } catch (e) {
         console.warn('Failed to load categories, using defaults', e)

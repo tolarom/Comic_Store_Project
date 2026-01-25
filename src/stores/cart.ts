@@ -157,10 +157,11 @@ export const useCartStore = defineStore('cart', () => {
 
     const user = getCurrentUser()
     const uid = user ? user._id || (user as any).id : null
-    if (uid) {
+
+    if (uid && prev.length > 0) {
       void apiClearCart(uid as string).catch((e) => {
         console.warn('Failed to clear cart on backend', e)
-        // restore on failure
+
         cartItems.value = prev
         saveCart()
       })

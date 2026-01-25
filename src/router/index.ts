@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { isAuthenticated, isAdmin } from '@/services/api'
 
 import LoginPage from '@/views/Auth/LogIn-Page.vue'
 import SignUpPage from '@/views/Auth/SignUp-Page.vue'
@@ -22,10 +21,23 @@ import UserControl from '@/views/Admin/UserControl.vue'
 import OrderHistory from '@/views/Admin/OrderHistory.vue'
 
 const routes = [
-  // Root - redirect to login or home based on auth
+  // Root - redirect based on auth status
   {
     path: '/',
-    redirect: '/client/shop',
+    redirect: () => {
+      const authToken = localStorage.getItem('authToken')
+      const storedUser = localStorage.getItem('user')
+      
+      if (authToken && storedUser) {
+        try {
+          const user = JSON.parse(storedUser)
+          return user?.role === 'admin' ? '/admin/dashboard' : '/client/shop'
+        } catch {
+          return '/loginPage'
+        }
+      }
+      return '/loginPage'
+    },
   },
 
   // Authentication routes (public)
@@ -159,7 +171,7 @@ const routes = [
   // Catch-all route for 404 - MUST BE LAST
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/client/shop',
+    redirect: '/loginPage',
     meta: { title: 'Not Found' },
   },
 ]
@@ -180,25 +192,49 @@ router.beforeEach((to, from, next) => {
   const requiresAuth = to.meta.requiresAuth as boolean || false
   const requiresAdmin = to.meta.requiresAdmin as boolean || false
   const requiresClient = to.meta.requiresClient as boolean || false
-  const isUserAuthenticated = isAuthenticated()
-  const isUserAdmin = isAdmin()
   
-  // If route requires authentication
+  // Check both token AND user object exist (both required for valid auth)
+  const authToken = localStorage.getItem('authToken')
+  const storedUser = localStorage.getItem('user')
+  const isUserAuthenticated = !!authToken && !!storedUser
+  
+  console.log(`🔍 Route Guard - Path: ${to.path}`)
+  console.log(`  - requiresAuth: ${requiresAuth}, requiresAdmin: ${requiresAdmin}, requiresClient: ${requiresClient}`)
+  console.log(`  - authToken exists: ${!!authToken}, storedUser exists: ${!!storedUser}`)
+  console.log(`  - isUserAuthenticated: ${isUserAuthenticated}`)
+  
+  let isUserAdmin = false
+  if (isUserAuthenticated && storedUser) {
+    try {
+      const user = JSON.parse(storedUser)
+      isUserAdmin = user?.role === 'admin'
+      console.log(`  - User role: ${user?.role}`)
+    } catch {
+      // Invalid user data, treat as unauthenticated
+      console.log(`  - Invalid user data, clearing localStorage`)
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('user')
+    }
+  }
+
+  // If route requires authentication and user is not authenticated
   if (requiresAuth && !isUserAuthenticated) {
-    // Redirect to login
+    console.log(`❌ Blocked: Route requires auth but user not authenticated`)
     next({ name: 'LoginPage' })
     return
   }
   
   // If route requires admin role and user is not admin
   if (requiresAdmin && !isUserAdmin) {
-    // Redirect to home if not admin
-    next({ name: 'Homeview' })
+    console.log(`❌ Blocked: Route requires admin but user is not admin`)
+    // Redirect to login if not authenticated, otherwise to home
+    next({ name: isUserAuthenticated ? 'Homeview' : 'LoginPage' })
     return
   }
   
   // If route requires client role and user is admin
   if (requiresClient && isUserAdmin) {
+    console.log(`❌ Blocked: Route requires client but user is admin`)
     // Redirect to admin dashboard if user is admin
     next({ name: 'Dashboard' })
     return
@@ -206,11 +242,13 @@ router.beforeEach((to, from, next) => {
   
   // If user is authenticated and trying to access login/signup, redirect to appropriate home
   if ((to.path === '/loginPage' || to.path === '/signUpPage') && isUserAuthenticated) {
+    console.log(`✅ Redirecting authenticated user from login/signup`)
     // Redirect admin to dashboard, client to shop
     next({ name: isUserAdmin ? 'Dashboard' : 'Homeview' })
     return
   }
   
+  console.log(`✅ Allowing navigation`)
   next()
 })
 

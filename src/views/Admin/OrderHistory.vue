@@ -144,7 +144,11 @@
                       @click="toggleStatusMenu(order._id, $event)"
                       class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center gap-1"
                       :class="{ 'bg-gray-50': activeStatusMenu === order._id }"
-                      :ref="el => { if (el) buttonRefs[order._id] = el }"
+                      :ref="
+                        (el) => {
+                          if (el) buttonRefs[order._id] = el
+                        }
+                      "
                     >
                       <i class="pi pi-refresh text-xs"></i>
                       Update
@@ -154,9 +158,13 @@
                     <div
                       v-if="activeStatusMenu === order._id"
                       :class="[
-                        'absolute right-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 z-10',
-                        dropdownPosition === 'top' ? 'bottom-full mb-2' : 'top-full mt-2'
+                        'fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50',
                       ]"
+                      :style="{
+                        top: dropdownPosition === 'top' ? (dropdownTop - 320) + 'px' : (dropdownTop + 40) + 'px',
+                        right: 'auto',
+                        left: (dropdownLeft - 224) + 'px',
+                      }"
                     >
                       <div class="p-2">
                         <p class="text-xs font-semibold text-gray-500 uppercase px-3 py-1">
@@ -375,6 +383,8 @@ const orders = ref<any[]>([])
 const loading = ref(false)
 const activeStatusMenu = ref<string | null>(null)
 const dropdownPosition = ref<'top' | 'bottom'>('bottom')
+const dropdownTop = ref(0)
+const dropdownLeft = ref(0)
 const buttonRefs: Record<string, HTMLElement> = {}
 
 // Status configurations
@@ -438,17 +448,22 @@ const toggleStatusMenu = (orderId: string, event?: Event) => {
     activeStatusMenu.value = null
   } else {
     activeStatusMenu.value = orderId
-    
+
     // Calculate dropdown position
     if (event) {
       const button = event.currentTarget as HTMLElement
       const buttonRect = button.getBoundingClientRect()
-      const dropdownHeight = 300 // Approximate height of dropdown
+      const dropdownHeight = 320 // Height of dropdown
+      const navbarHeight = 100 // Height of navbar/header
       const spaceBelow = window.innerHeight - buttonRect.bottom
-      const spaceAbove = buttonRect.top
-      
+      const spaceAbove = buttonRect.top - navbarHeight
+
+      // Store button position for fixed positioning
+      dropdownTop.value = buttonRect.top
+      dropdownLeft.value = buttonRect.right
+
       // Show dropdown above if there's not enough space below and there's more space above
-      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+      if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
         dropdownPosition.value = 'top'
       } else {
         dropdownPosition.value = 'bottom'
@@ -609,10 +624,10 @@ const activeOrdersCount = computed(
 const cancelledOrdersCount = computed(
   () => orders.value.filter((o: any) => o.status === 'cancelled').length,
 )
-const totalRevenue = computed(() => 
+const totalRevenue = computed(() =>
   orders.value
     .filter((o: any) => o.status !== 'cancelled')
-    .reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0)
+    .reduce((sum: number, o: any) => sum + (o.total_amount || 0), 0),
 )
 
 const formatDate = (dateString: string) => {
@@ -693,75 +708,75 @@ const getStatusProgressClass = (status: string) => {
 
 const getOrderTimeline = (order: any) => {
   if (!order) return []
-  
+
   const currentStatus = order.status
   const isPickup = order.delivery_method === 'pickup'
-  
+
   if (isPickup) {
     const steps = [
-      { 
-        label: 'Order Placed', 
+      {
+        label: 'Order Placed',
         description: 'Order has been received',
         icon: 'pi pi-shopping-cart',
-        status: 'pending'
+        status: 'pending',
       },
-      { 
-        label: 'Processing', 
+      {
+        label: 'Processing',
         description: 'Preparing your order',
         icon: 'pi pi-cog',
-        status: 'processing'
+        status: 'processing',
       },
-      { 
-        label: 'Ready for Pickup', 
+      {
+        label: 'Ready for Pickup',
         description: 'Your order is ready to collect',
         icon: 'pi pi-check-circle',
-        status: 'completed'
-      }
+        status: 'completed',
+      },
     ]
-    
+
     const statusOrder = ['pending', 'processing', 'completed']
     const currentIndex = statusOrder.indexOf(currentStatus)
-    
+
     return steps.map((step, index) => ({
       ...step,
       completed: index < currentIndex || (currentStatus === 'completed' && index <= 2),
-      current: statusOrder[index] === currentStatus
+      current: statusOrder[index] === currentStatus,
     }))
   } else {
     const steps = [
-      { 
-        label: 'Order Placed', 
+      {
+        label: 'Order Placed',
         description: 'Order has been received',
         icon: 'pi pi-shopping-cart',
-        status: 'pending'
+        status: 'pending',
       },
-      { 
-        label: 'Processing', 
+      {
+        label: 'Processing',
         description: 'Preparing your order',
         icon: 'pi pi-cog',
-        status: 'processing'
+        status: 'processing',
       },
-      { 
-        label: 'Shipped', 
+      {
+        label: 'Shipped',
         description: 'Order is on its way',
         icon: 'pi pi-truck',
-        status: 'shipped'
+        status: 'shipped',
       },
-      { 
-        label: 'Delivered', 
+      {
+        label: 'Delivered',
         description: 'Order has been delivered',
         icon: 'pi pi-check-circle',
-        status: 'delivered'
-      }
+        status: 'delivered',
+      },
     ]
-    
+
     const statusOrder = ['pending', 'processing', 'shipped', 'delivered']
     const currentIndex = statusOrder.indexOf(currentStatus)
-    
+
     return steps.map((step, index) => ({
       ...step,
       completed: index < currentIndex || (currentStatus === 'delivered' && index <= 3),
-      current: statusOrder[index] === currentStatus
+      current: statusOrder[index] === currentStatus,
     }))
   }
 }

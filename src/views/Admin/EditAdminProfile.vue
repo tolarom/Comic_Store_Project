@@ -39,9 +39,7 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
             <div class="flex flex-col items-center gap-6">
               <img
-                :src="
-                  previewUrl || form.image_url || 'https://via.placeholder.com/200x200.png?text=Profile+Picture'
-                "
+                :src="previewUrl || form.image_url || '/images/noProfile.png'"
                 alt="Profile Preview"
                 class="w-40 h-40 rounded-full object-cover border-4 border-blue-200 shadow-lg"
               />

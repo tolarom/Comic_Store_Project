@@ -63,10 +63,6 @@
         <span class="text-sm font-semibold text-gray-900">{{ product.stock }} units</span>
       </div>
 
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-gray-600">Sales:</span>
-        <span class="text-sm font-semibold text-gray-900">{{ product.sales }}</span>
-      </div>
 
       <div class="mt-3 pt-3 border-t border-gray-100">
         <span class="text-xl font-bold text-blue-600">${{ product.price.toFixed(2) }}</span>

@@ -14,7 +14,6 @@
         <router-link to="/"><img src="/logo.png" alt="" class="h-[30px]" /></router-link>
       </div>
       <ul class="hidden md:flex gap-6 items-center">
-        <li><router-link to="/new" class="hover:text-gray-200">NEW ARRIVALS</router-link></li>
         <li class="relative" v-for="(menu, index) in dropdowns" :key="index">
           <button
             @click="toggleDropdown(index)"
@@ -139,57 +138,10 @@
           </span>
         </router-link>
       </div>
-      <div class="md:hidden cursor-pointer text-2xl" @click="isMenuOpen = !isMenuOpen">
-        <span class="pi pi-bars"></span>
-      </div>
     </nav>
 
-    <!-- Mobile Menu -->
-    <div
-      v-if="isMenuOpen"
-      class="md:hidden bg-[#5F6FFF] text-white flex flex-col space-y-3 fixed left-0 right-0 z-40 p-4 transition-all duration-500 ease-in-out"
-      :class="isNavVisible ? 'top-[82px] opacity-100' : '-top-[200px] opacity-0'"
-    >
-      <router-link to="/new">NEW ARRIVALS</router-link>
-      <div v-for="(menu, index) in dropdowns" :key="index">
-        <button
-          @click="toggleDropdown(index)"
-          class="w-full text-left flex justify-between items-center py-2"
-        >
-          {{ menu.title }}
-          <span
-            class="pi pi-chevron-down text-xs transition-transform duration-200"
-            :class="menu.open ? 'rotate-180' : ''"
-          ></span>
-        </button>
-        <transition
-          enter-active-class="transition duration-200 ease-out"
-          enter-from-class="opacity-0 max-h-0"
-          enter-to-class="opacity-100 max-h-96"
-          leave-active-class="transition duration-150 ease-in"
-          leave-from-class="opacity-100 max-h-96"
-          leave-to-class="opacity-0 max-h-0"
-        >
-          <ul
-            v-if="menu.open"
-            class="bg-white text-black rounded-lg shadow-lg py-2 mt-2 ml-4 overflow-hidden"
-          >
-            <li v-for="(item, i) in menu.items" :key="i">
-              <router-link
-                class="block px-4 py-2 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2 cursor-pointer"
-                :to="item.link"
-              >
-                <i class="pi pi-circle-fill text-[6px]"></i>
-                {{ item.name }}
-              </router-link>
-            </li>
-          </ul>
-        </transition>
-      </div>
-    </div>
-
     <!-- Spacer -->
-    <div class="h-[82px] md:h-[50px]"></div>
+    <div class="h-[50px]"></div>
   </div>
 </template>
 
@@ -202,7 +154,6 @@ import { getAllGroups, getCategoriesByGroup } from '../../services/api'
 
 const cartStore = useCartStore()
 const { currentUser, isAuthenticated, logout } = useAuth()
-const isMenuOpen = ref(false)
 const showProfileMenu = ref(false)
 
 // Dropdown menus (populated from backend groups/categories)
@@ -277,10 +228,9 @@ onMounted(() => {
   fetchNavGroups()
 })
 
-// Close all dropdowns and mobile menu
+// Close all dropdowns
 const closeAllDropdowns = () => {
   dropdowns.forEach((d) => (d.open = false))
-  isMenuOpen.value = false
 }
 
 // Use scroll direction composable with auto-close on scroll

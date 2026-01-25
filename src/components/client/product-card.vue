@@ -158,7 +158,7 @@ export default {
 }
 
 .product-image {
-  width: 100%;
+  width: 70%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;

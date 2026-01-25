@@ -311,6 +311,7 @@ import {
   activateUser as apiActivateUser,
   updateUserActive as apiUpdateUserActive,
 } from '@/services/api'
+import { useAuth } from '@/composables/useAuth'
 
 // UserModal is implemented as a separate SFC to ensure template compilation
 
@@ -322,6 +323,7 @@ export default {
   },
   setup() {
     const users = ref([])
+    const { currentUser } = useAuth()
     const loading = ref(false)
     const error = ref(null)
     const lastApiError = ref(null)
@@ -439,8 +441,20 @@ export default {
     const roles = ref(['All Roles', 'Customer', 'Admin'])
     const statuses = ref(['All Status', 'Active', 'Blocked'])
 
+    const displayedUsers = computed(() => {
+      // exclude the currently logged-in account from the list
+      if (!currentUser.value) return users.value
+      const curId = normalizeId(currentUser.value._id) || normalizeId((currentUser.value).id) || null
+      const curEmail = (currentUser.value as any).email || null
+      return users.value.filter((u) => {
+        if (u.backend_id && curId) return normalizeId(u.backend_id) !== curId
+        if (curEmail) return u.email !== curEmail
+        return true
+      })
+    })
+
     const filteredUsers = computed(() => {
-      let filtered = users.value
+      let filtered = displayedUsers.value
 
       // Filter by role
       if (selectedRole.value !== 'All Roles') {
@@ -466,9 +480,9 @@ export default {
       return filtered
     })
 
-    const activeUsers = computed(() => users.value.filter((u) => u.status === 'Active').length)
-    const adminUsers = computed(() => users.value.filter((u) => u.role === 'Admin').length)
-    const blockedUsers = computed(() => users.value.filter((u) => u.status === 'Blocked').length)
+    const activeUsers = computed(() => displayedUsers.value.filter((u) => u.status === 'Active').length)
+    const adminUsers = computed(() => displayedUsers.value.filter((u) => u.role === 'Admin').length)
+    const blockedUsers = computed(() => displayedUsers.value.filter((u) => u.status === 'Blocked').length)
 
     const toggleRoleDropdown = () => {
       showRoleDropdown.value = !showRoleDropdown.value
@@ -557,6 +571,7 @@ export default {
           try {
             await apiRegister(payload)
             await loadUsers()
+            lastApiError.value = null
           } catch (e) {
             // fallback: add locally so UI reflects change
             console.warn('API create failed, falling back to local add', e)
@@ -572,6 +587,7 @@ export default {
               address: payload.address,
               joinedDate: new Date().toISOString().split('T')[0],
             })
+            lastApiError.value = null
           }
         } else if (modalState.value.mode === 'edit') {
           // update backend user by backend_id
@@ -589,6 +605,7 @@ export default {
               console.debug('API updateUser', { id: String(backendId), updates })
               await apiUpdateUser(String(backendId), updates)
               await loadUsers()
+              lastApiError.value = null
             } catch (e) {
               console.warn('API update failed, falling back to local update', e)
               const msg = formatApiError(e)
@@ -612,6 +629,7 @@ export default {
                     role: userData.role === 'Admin' ? 'Admin' : 'Customer',
                   },
                 }
+                lastApiError.value = null
               }
             }
           } else {
@@ -628,6 +646,7 @@ export default {
                   role: userData.role === 'Admin' ? 'Admin' : 'Customer',
                 },
               }
+              lastApiError.value = null
             }
           }
         }
@@ -651,7 +670,12 @@ export default {
       // API expects `active: 'active' | 'blocked'` (lowercase)
       const apiStatus = newStatus === 'Active' ? 'active' : 'blocked'
 
-      const idx = users.value.findIndex((u) => u.id === user.id || normalizeId(u.backend_id) === normalizeId(user.backend_id))
+      // Find local index by backend id, email or numeric id
+      const idx = users.value.findIndex((u) => {
+        if (backendId && u.backend_id) return normalizeId(u.backend_id) === normalizeId(backendId)
+        if (user.email && u.email) return u.email === user.email
+        return u.id === user.id
+      })
       const previousStatus = idx !== -1 ? users.value[idx].status : null
 
       // Optimistic update
@@ -662,14 +686,10 @@ export default {
         if (!backendId) {
           const key = user.id ? `local:${user.id}` : `local:${idx + 1}`
           if (key) setStatusOverride(key, newStatus)
+          lastApiError.value = null
           return
         }
 
-        // Try server endpoints in order of preference:
-        // 1) POST /api/users/{id}/block or /activate
-        // 2) PUT /api/users/{id} with { active: 'blocked'|'active' }
-        // 3) PUT /api/users/{id} with { active: boolean }
-        // 4) Fallback to legacy { status: 'Active'|'Blocked' }
         let succeeded = false
 
         try {
@@ -713,7 +733,9 @@ export default {
         if (succeeded) {
           const key = backendId || (user.id ? `local:${user.id}` : `local:${idx + 1}`)
           if (key) setStatusOverride(key, newStatus)
-          if (idx !== -1) users.value[idx].status = newStatus
+          // refresh authoritative user list from server to avoid drift
+          await loadUsers()
+          lastApiError.value = null
           return
         }
 
@@ -782,7 +804,7 @@ export default {
       showStatusDropdown,
       roles,
       statuses,
-      users: computed(() => users.value),
+      users: computed(() => displayedUsers.value),
       filteredUsers,
       activeUsers,
       adminUsers,
