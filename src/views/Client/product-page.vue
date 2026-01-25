@@ -36,6 +36,8 @@
             <option value="default">default</option>
             <option value="price-low">Price: Low to High</option>
             <option value="price-high">Price: High to Low</option>
+            <option value="discount-price-low">Price After Discount: Low to High</option>
+            <option value="discount-price-high">Price After Discount: High to Low</option>
             <option value="alpha-asc">Alphabet: A to Z</option>
             <option value="alpha-desc">Alphabet: Z to A</option>
           </select>
@@ -210,7 +212,7 @@ const products = computed(() => {
   return selectedCategory.value === 'all' ? productsStore.products : apiProducts.value
 })
 
-const sortOption = ref<'default' | 'price-low' | 'price-high' | 'alpha-asc' | 'alpha-desc'>(
+const sortOption = ref<'default' | 'price-low' | 'price-high' | 'discount-price-low' | 'discount-price-high' | 'alpha-asc' | 'alpha-desc'>(
   'default',
 )
 const selectedCategory = ref<string>('all')
@@ -252,6 +254,11 @@ watch(
  , { immediate: true }
 )
 
+// Helper function to calculate price after discount
+const getPriceAfterDiscount = (product: ProductItem): number => {
+  return product.discount ? product.price * (1 - product.discount / 100) : product.price
+}
+
 const sortedProducts = computed<ProductItem[]>(() => {
   let productsCopy = [...products.value]
 
@@ -272,6 +279,10 @@ const sortedProducts = computed<ProductItem[]>(() => {
       return productsCopy.sort((a, b) => a.price - b.price)
     case 'price-high':
       return productsCopy.sort((a, b) => b.price - a.price)
+    case 'discount-price-low':
+      return productsCopy.sort((a, b) => getPriceAfterDiscount(a) - getPriceAfterDiscount(b))
+    case 'discount-price-high':
+      return productsCopy.sort((a, b) => getPriceAfterDiscount(b) - getPriceAfterDiscount(a))
     case 'alpha-asc':
       return productsCopy.sort((a, b) => a.title.localeCompare(b.title))
     case 'alpha-desc':

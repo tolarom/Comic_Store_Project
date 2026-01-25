@@ -13,9 +13,7 @@
       {{ item.name }}
     </div>
     <div class="quantity-controls flex items-center gap-2">
-      <button @click="decreaseQuantity" :disabled="item.quantity <= 1" class="qty-btn">-</button>
-      <span class="quantity w-8 text-center">{{ item.quantity }}</span>
-      <button @click="increaseQuantity" class="qty-btn">+</button>
+      <span class="quantity w-20 text-center">Total: {{ item.quantity }}</span>
     </div>
     <div class="price text-gray-600">${{ item.price.toFixed(2) }}/pcs</div>
     <div class="total font-bold text-gray-800">${{ (item.price * item.quantity).toFixed(2) }}</div>
@@ -64,15 +62,6 @@ const removeItem = () => {
   emit('remove', props.item.id)
 }
 
-const increaseQuantity = () => {
-  emit('updateQuantity', props.item.id, props.item.quantity + 1)
-}
-
-const decreaseQuantity = () => {
-  if (props.item.quantity > 1) {
-    emit('updateQuantity', props.item.id, props.item.quantity - 1)
-  }
-}
 
 const toggleSelected = (event: Event) => {
   const target = event.target as HTMLInputElement
