@@ -24,8 +24,14 @@
         </button>
       </div>
 
+      <!-- Loading State -->
+      <div v-if="isLoading" class="bg-white rounded-lg shadow-sm p-12 text-center">
+        <i class="pi pi-spin pi-spinner text-blue-600 text-6xl mb-4"></i>
+        <p class="text-gray-600">Loading your orders...</p>
+      </div>
+
       <!-- Orders List -->
-      <div class="space-y-4">
+      <div v-else class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.id"
@@ -35,6 +41,27 @@
             <div>
               <p class="text-sm text-gray-600">Order #{{ order.id }}</p>
               <p class="text-sm text-gray-600">{{ formatDate(order.date) }}</p>
+              <p
+                class="text-sm font-medium mt-1"
+                :class="
+                  order.order_type === 'pickup' && order.status === 'delivered'
+                    ? 'text-green-600'
+                    : order.order_type === 'pickup'
+                      ? 'text-purple-600'
+                      : 'text-blue-600'
+                "
+              >
+                <i
+                  :class="order.order_type === 'pickup' ? 'pi pi-shopping-bag' : 'pi pi-truck'"
+                ></i>
+                {{
+                  order.order_type === 'pickup'
+                    ? order.status === 'delivered'
+                      ? 'Picked Up ✓'
+                      : 'Pickup'
+                    : 'Delivery'
+                }}
+              </p>
             </div>
             <span :class="getStatusClass(order.status)">{{ order.status }}</span>
           </div>
@@ -58,10 +85,11 @@
             <div class="text-lg font-bold">Total: ${{ order.total.toFixed(2) }}</div>
             <div class="flex gap-3">
               <button
-                v-if="order.status === 'delivered'"
+                v-if="isOrderComplete(order)"
                 @click="rateOrder(order.id)"
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center gap-2"
               >
+                <i class="pi pi-star"></i>
                 Rate Order
               </button>
             </div>
@@ -92,96 +120,127 @@
       </div>
     </div>
   </div>
-    <FooterPage />
+  <FooterPage />
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import NavigationBar from '@/components/client/NavigationBar.vue'
-import { useRatingSessionStore } from '@/stores/ratingSession'
-import FooterPage from '@/components/client/FooterPage.vue'
+import NavigationBar from '../../components/client/NavigationBar.vue'
+import { useRatingSessionStore } from '../../stores/ratingSession'
+import FooterPage from '../../components/client/FooterPage.vue'
+import { useAuth } from '../../composables/useAuth'
+import { getUserOrders, getProductById } from '../../services/api'
 
 const router = useRouter()
 const ratingSessionStore = useRatingSessionStore()
+const { currentUser } = useAuth()
 const filterStatus = ref('all')
+const isLoading = ref(true)
 
-const orders = ref([
-  {
-    id: 'ORD-2026-001',
-    date: '2026-01-15T10:30:00',
-    total: 89.99,
-    status: 'delivered',
-    items: [
-      {
-        id: '1',
-        name: 'Spider-Man Vol 1',
-        price: 29.99,
-        quantity: 2,
-        image: '/images/placeholder.jpg',
-      },
-      {
-        id: '2',
-        name: 'Batman Issue #1',
-        price: 30.01,
-        quantity: 1,
-        image: '/images/placeholder.jpg',
-      },
-    ],
-  },
-  {
-    id: 'ORD-2026-002',
-    date: '2026-01-18T14:20:00',
-    total: 45.5,
-    status: 'shipped',
-    items: [
-      {
-        id: '3',
-        name: 'X-Men Collection',
-        price: 45.5,
-        quantity: 1,
-        image: '/images/placeholder.jpg',
-      },
-    ],
-  },
-  {
-    id: 'ORD-2026-003',
-    date: '2026-01-19T09:15:00',
-    total: 120.0,
-    status: 'processing',
-    items: [
-      {
-        id: '4',
-        name: 'Marvel Complete Set',
-        price: 120.0,
-        quantity: 1,
-        image: '/images/placeholder.jpg',
-      },
-    ],
-  },
-  {
-    id: 'ORD-2026-004',
-    date: '2026-01-10T16:45:00',
-    total: 67.98,
-    status: 'pending',
-    items: [
-      {
-        id: '5',
-        name: 'Wonder Woman #1',
-        price: 25.99,
-        quantity: 2,
-        image: '/images/placeholder.jpg',
-      },
-      {
-        id: '6',
-        name: 'The Flash Comics',
-        price: 16.0,
-        quantity: 1,
-        image: '/images/placeholder.jpg',
-      },
-    ],
-  },
-])
+interface OrderItemDisplay {
+  id: string
+  product_id: string
+  name: string
+  price: number
+  quantity: number
+  image: string
+}
+
+interface OrderDisplay {
+  id: string
+  date: string
+  total: number
+  status: string
+  order_type?: string
+  items: OrderItemDisplay[]
+}
+
+const orders = ref<OrderDisplay[]>([])
+
+// Load user orders from API
+const loadOrders = async () => {
+  if (!currentUser.value) {
+    isLoading.value = false
+    return
+  }
+
+  try {
+    isLoading.value = true
+
+    // Extract user ID
+    let userId = ''
+    if (currentUser.value._id) {
+      if (typeof currentUser.value._id === 'string') {
+        userId = currentUser.value._id
+      } else if ((currentUser.value._id as any).$oid) {
+        userId = (currentUser.value._id as any).$oid
+      }
+    } else if ((currentUser.value as any).id) {
+      userId = String((currentUser.value as any).id)
+    }
+
+    if (!userId) {
+      console.warn('No user ID found')
+      isLoading.value = false
+      return
+    }
+
+    // Fetch orders for this user
+    const userOrders = await getUserOrders(userId)
+
+    // Transform orders to display format with product details
+    const ordersWithDetails = await Promise.all(
+      userOrders.map(async (order) => {
+        const items = await Promise.all(
+          order.products.map(async (product) => {
+            try {
+              // Fetch product details
+              const productDetails = await getProductById(product.product_id)
+              return {
+                id: product.product_id,
+                product_id: product.product_id,
+                name: productDetails.title || 'Unknown Product',
+                price: product.price,
+                quantity: product.quantity,
+                image: productDetails.image_url || '/images/placeholder.jpg',
+              }
+            } catch (err) {
+              console.warn(`Failed to load product ${product.product_id}:`, err)
+              return {
+                id: product.product_id,
+                product_id: product.product_id,
+                name: 'Product Unavailable',
+                price: product.price,
+                quantity: product.quantity,
+                image: '/images/placeholder.jpg',
+              }
+            }
+          }),
+        )
+
+        return {
+          id: order._id || order.id || 'unknown',
+          date: order.created_at || new Date().toISOString(),
+          total: order.total_price,
+          status: order.status,
+          order_type: order.order_type || 'shipping',
+          items,
+        }
+      }),
+    )
+
+    orders.value = ordersWithDetails
+  } catch (error) {
+    console.error('Failed to load orders:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  loadOrders()
+})
 
 const orderStatuses = [
   { value: 'all', label: 'All Orders' },
@@ -189,6 +248,7 @@ const orderStatuses = [
   { value: 'processing', label: 'Processing' },
   { value: 'shipped', label: 'Shipped' },
   { value: 'delivered', label: 'Delivered' },
+  { value: 'completed', label: 'Completed' },
 ]
 
 const filteredOrders = computed(() => {
@@ -213,8 +273,14 @@ const getStatusClass = (status: string) => {
     processing: 'px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700',
     shipped: 'px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700',
     delivered: 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700',
+    completed: 'px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700',
   }
   return classes[status] || 'px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-700'
+}
+
+const isOrderComplete = (order: OrderDisplay): boolean => {
+  // Order is complete if status is delivered or complete
+  return order.status === 'delivered' || order.status === 'completed'
 }
 
 const rateOrder = (orderId: string) => {
@@ -222,7 +288,8 @@ const rateOrder = (orderId: string) => {
   if (order) {
     ratingSessionStore.setItems(
       order.items.map((item) => ({
-        id: item.id,
+        id: parseInt(item.id) || 0,
+        backend_id: item.product_id,
         name: item.name,
         image: item.image,
         quantity: item.quantity,

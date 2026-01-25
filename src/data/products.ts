@@ -32,22 +32,33 @@ export const useProductsStore = defineStore('products', () => {
       if (backendProducts && Array.isArray(backendProducts) && backendProducts.length > 0) {
         console.log('Products fetched from API:', backendProducts)
         // Transform backend products to local format
-        products.value = backendProducts.map((p: Product, index: number) => ({
-          id: index + 1,
-          backend_id: (p._id || p.id) as string,
-          title: p.title || 'Untitled',
-          subtitle: p.category || 'Product',
-          description: p.description || '',
-          price: p.price || 0,
-          // prefer explicit `discount` field, fall back to legacy `discount_percent`
-          discount: (p as any).discount ?? (p as any).discount_percent ?? 0,
-          rating: 0,
-          reviewCount: 0,
-          image: p.image_url || '',
-          category: p.category || '',
-          stock: p.stock || 0,
-          sales: 0,
-        }))
+        products.value = backendProducts.map((p: Product, index: number) => {
+          // Extract _id properly - it might be an object or string
+          let backendId = ''
+          if (p._id) {
+            // If _id is an object with $oid property (MongoDB extended JSON)
+            backendId = typeof p._id === 'object' ? (p._id as any).$oid || String(p._id) : String(p._id)
+          } else if (p.id) {
+            backendId = typeof p.id === 'object' ? (p.id as any).$oid || String(p.id) : String(p.id)
+          }
+
+          return {
+            id: index + 1,
+            backend_id: backendId,
+            title: p.title || 'Untitled',
+            subtitle: p.category || 'Product',
+            description: p.description || '',
+            price: p.price || 0,
+            // prefer explicit `discount` field, fall back to legacy `discount_percent`
+            discount: (p as any).discount ?? (p as any).discount_percent ?? 0,
+            rating: 0,
+            reviewCount: 0,
+            image: p.image_url || '',
+            category: p.category || '',
+            stock: p.stock || 0,
+            sales: 0,
+          }
+        })
       } else {
         console.log('No products from API')
       }

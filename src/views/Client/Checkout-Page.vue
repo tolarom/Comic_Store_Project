@@ -100,44 +100,18 @@
               />
             </div>
 
-            <!-- City / State / Zip -->
-            <div v-if="shippingMethod === 'delivery'" class="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1"
-                  >City <span class="text-red-500">*</span></label
-                >
-                <input
-                  v-model="form.city"
-                  type="text"
-                  :required="shippingMethod === 'delivery'"
-                  placeholder="New York"
-                  class="w-full px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1"
-                  >State <span class="text-red-500">*</span></label
-                >
-                <input
-                  v-model="form.state"
-                  type="text"
-                  :required="shippingMethod === 'delivery'"
-                  placeholder="NY"
-                  class="w-full px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1"
-                  >Zip Code <span class="text-red-500">*</span></label
-                >
-                <input
-                  v-model="form.zip"
-                  type="text"
-                  :required="shippingMethod === 'delivery'"
-                  placeholder="10001"
-                  class="w-full px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+            <!-- Address -->
+            <div v-if="shippingMethod === 'delivery'">
+              <label class="block text-sm font-medium text-gray-700 mb-1">
+                Address <span class="text-red-500">*</span>
+              </label>
+              <textarea
+                v-model="form.address"
+                :required="shippingMethod === 'delivery'"
+                placeholder="123 Main St, Apt 4B, New York, NY 10001"
+                rows="3"
+                class="w-full px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition resize-none"
+              ></textarea>
             </div>
 
             <!-- Terms & Conditions -->
@@ -224,112 +198,25 @@
       </div>
     </div>
   </div>
-
-  <!-- Success Modal -->
-  <transition
-    enter-active-class="transition duration-300 ease-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition duration-200 ease-in"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="showSuccessModal"
-      class="fixed inset-0 bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-      @click="closeModal"
-    >
-      <transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="opacity-0 scale-95 translate-y-4"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-active-class="transition duration-200 ease-in"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 translate-y-4"
-      >
-        <div
-          v-if="showSuccessModal"
-          @click.stop
-          class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8"
-        >
-          <!-- Success Icon -->
-          <div class="flex justify-center mb-6">
-            <div class="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
-              <svg
-                class="w-12 h-12 text-green-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="3"
-                  d="M5 13l4 4L19 7"
-                ></path>
-              </svg>
-            </div>
-          </div>
-
-          <!-- Success Message -->
-          <h3 class="text-2xl font-bold text-gray-800 text-center mb-3">
-            Order Placed Successfully!
-          </h3>
-          <p class="text-gray-600 text-center mb-6">
-            Thank you for shopping with us. Your order has been confirmed and will be processed
-            shortly.
-          </p>
-
-          <!-- Order Details -->
-          <div class="bg-gray-50 rounded-xl p-4 mb-6">
-            <div class="flex justify-between text-sm mb-2">
-              <span class="text-gray-600">Order Total:</span>
-              <span class="font-bold text-gray-800">${{ grandTotal.toFixed(2) }}</span>
-            </div>
-            <div class="flex justify-between text-sm mb-2">
-              <span class="text-gray-600">Items:</span>
-              <span class="font-medium text-gray-800">{{ cartItems.length }} product(s)</span>
-            </div>
-            <div class="flex justify-between text-sm mb-2">
-              <span class="text-gray-600">Delivery Method:</span>
-              <span class="font-medium text-gray-800 capitalize">{{ shippingMethod }}</span>
-            </div>
-            <div v-if="shippingMethod === 'delivery'" class="flex justify-between text-sm">
-              <span class="text-gray-600">Location:</span>
-              <span class="font-medium text-gray-800"
-                >{{ country }}, {{ form.city }}, {{ form.state }}</span
-              >
-            </div>
-            <div class="flex justify-between text-sm mb-2">
-              <span class="text-gray-600">Phone Number:</span>
-              <span class="font-medium text-gray-800 capitalize">{{ form.phone }}</span>
-            </div>
-          </div>
-
-          <!-- Action Button -->
-          <div>
-            <button
-              @click="closeModal"
-              class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              Continue Shopping
-            </button>
-          </div>
-        </div>
-      </transition>
-    </div>
-  </transition>
   <FooterPage />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCartStore } from '@/stores/cart'
-import FooterPage from '@/components/client/FooterPage.vue'
-import { createOrder, getCurrentUser } from '@/services/api'
+import { useCartStore } from '../../stores/cart'
+import FooterPage from '../../components/client/FooterPage.vue'
+import {
+  createOrder,
+  getCurrentUser,
+  updateProduct,
+  getProductById,
+  getUserById,
+} from '../../services/api'
+import { useAuth } from '../../composables/useAuth'
 
 const cartStore = useCartStore()
+const { currentUser } = useAuth()
 const shippingMethod = ref<'delivery' | 'pickup'>('delivery')
 
 const form = ref({
@@ -337,29 +224,40 @@ const form = ref({
   email: '',
   phone: '',
   country: '',
-  city: '',
-  state: '',
-  zip: '',
+  address: '',
   agreeToTerms: false,
 })
 
 const isPlacingOrder = ref(false)
-const showSuccessModal = ref(false)
+const isLoadingProfile = ref(false)
 const router = useRouter()
 
-// Load user profile from localStorage
-const loadUserProfile = () => {
-  const savedProfile = localStorage.getItem('userProfile')
-  if (savedProfile) {
-    try {
-      const profile = JSON.parse(savedProfile)
-      form.value.fullName = profile.fullName || ''
-      form.value.email = profile.email || ''
-      form.value.phone = profile.phoneNumber || ''
-      form.value.country = profile.country || ''
-    } catch (e) {
-      console.log('Could not parse user profile')
+// Load user information from API to get complete data
+const loadUserProfile = async () => {
+  if (!currentUser.value?.id) return
+
+  try {
+    isLoadingProfile.value = true
+    const fullUserData = await getUserById(currentUser.value.id)
+
+    // Populate form with complete user data
+    form.value.fullName = fullUserData.full_name || ''
+    form.value.email = fullUserData.email || ''
+    form.value.phone = fullUserData.phone || ''
+    form.value.country = fullUserData.country || ''
+    form.value.address = fullUserData.address || ''
+  } catch (err) {
+    console.error('Error loading user profile:', err)
+    // Fallback to currentUser data if API call fails
+    if (currentUser.value) {
+      form.value.fullName = currentUser.value.full_name || ''
+      form.value.email = currentUser.value.email || ''
+      form.value.phone = currentUser.value.phone || ''
+      form.value.country = currentUser.value.country || ''
+      form.value.address = currentUser.value.address || ''
     }
+  } finally {
+    isLoadingProfile.value = false
   }
 }
 
@@ -384,9 +282,7 @@ const grandTotal = computed(() => subtotal.value + shippingCost.value + tax.valu
 const canCheckout = computed(() => {
   const hasBasicInfo =
     form.value.fullName && form.value.email && form.value.phone && form.value.agreeToTerms
-  const hasAddress =
-    shippingMethod.value === 'pickup' ||
-    (form.value.country && form.value.city && form.value.state && form.value.zip)
+  const hasAddress = shippingMethod.value === 'pickup' || (form.value.country && form.value.address)
   return cartItems.value.length > 0 && hasBasicInfo && hasAddress
 })
 
@@ -401,18 +297,50 @@ const placeOrder = async () => {
 
   try {
     // Build order items from selected cart items
-    const items = cartItems.value.map((it) => ({
-      product_id: it.backend_id ? String(it.backend_id) : String(it.id),
-      quantity: it.quantity,
-      price: it.price,
-    }))
+    const items = cartItems.value.map((it) => {
+      // Ensure product_id is always a string, handle object cases
+      let productId = ''
+      if (it.backend_id) {
+        productId =
+          typeof it.backend_id === 'object'
+            ? (it.backend_id as any).$oid || String(it.backend_id)
+            : String(it.backend_id)
+      } else {
+        productId = String(it.id)
+      }
+
+      return {
+        product_id: productId,
+        quantity: it.quantity,
+        price: it.price,
+      }
+    })
 
     // Determine user id (authenticated user or guest email)
     const user = getCurrentUser()
-    const uid = user ? user._id || (user as any).id : form.value.email || `guest-${Date.now()}`
+    let uid = ''
+    if (user) {
+      // Handle ObjectId format properly
+      if (user._id) {
+        if (typeof user._id === 'string') {
+          uid = user._id
+        } else if ((user._id as any).$oid) {
+          uid = (user._id as any).$oid
+        } else {
+          uid = String(user._id)
+        }
+      } else if ((user as any).id) {
+        uid = String((user as any).id)
+      }
+    }
+
+    // Fallback to email if no user ID found
+    if (!uid) {
+      uid = form.value.email || `guest-${Date.now()}`
+    }
 
     const orderPayload = {
-      user_id: String(uid),
+      user_id: uid,
       products: items,
       total_price: Number(grandTotal.value),
       order_type: shippingMethod.value === 'delivery' ? 'shipping' : 'pickup',
@@ -421,24 +349,36 @@ const placeOrder = async () => {
     // Create order on backend
     await createOrder(orderPayload)
 
-    // On success, remove purchased items from cart and show modal
+    // Update product stock for each ordered item
+    try {
+      for (const item of items) {
+        try {
+          // Get current product data
+          const product = await getProductById(item.product_id)
+          if (product && product.stock >= item.quantity) {
+            // Reduce stock by the ordered quantity
+            await updateProduct(item.product_id, {
+              stock: product.stock - item.quantity,
+            })
+          }
+        } catch (err) {
+          console.warn(`Failed to update stock for product ${item.product_id}:`, err)
+        }
+      }
+    } catch (err) {
+      console.warn('Some products failed to update stock:', err)
+    }
+
+    // On success, remove purchased items from cart, show alert and redirect
     cartStore.removeSelectedItems()
-    showSuccessModal.value = true
+    alert('Order placed successfully! Thank you for shopping with us.')
+    router.push('/')
   } catch (e) {
     console.error('Failed to place order:', e)
     alert('Failed to place order. Please try again.')
   } finally {
     isPlacingOrder.value = false
   }
-}
-
-// Close modal and redirect
-const closeModal = () => {
-  showSuccessModal.value = false
-  cartStore.removeSelectedItems()
-  setTimeout(() => {
-    router.push('/')
-  }, 300)
 }
 </script>
 

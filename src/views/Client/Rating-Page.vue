@@ -7,6 +7,13 @@
       <h1 class="text-3xl font-bold text-gray-900 mb-3">Rate Your Items</h1>
       <p class="text-gray-600 mb-8">Please rate each item from your recent order.</p>
 
+      <!-- Info banner -->
+      <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <p class="text-sm text-blue-800">
+          <strong>Note:</strong> To submit ratings, the backend server must be running on <code class="bg-blue-100 px-2 py-1 rounded">http://localhost:8080</code>
+        </p>
+      </div>
+
       <div v-if="items.length" class="space-y-6">
         <div
           v-for="item in items"
@@ -33,19 +40,32 @@
               <span class="text-gray-700 text-sm">{{ feedbackFor(item.id).rating }} / 5</span>
             </div>
           </div>
+          <div class="flex-1">
+            <label class="sr-only">Comment for {{ item.name }}</label>
+            <textarea
+              v-model="feedbackFor(item.id).comment"
+              maxlength="500"
+              rows="3"
+              class="w-full border border-gray-200 rounded-md p-2 text-sm resize-none"
+              placeholder="Write a comment (optional)"
+            ></textarea>
+            <div class="text-xs text-gray-400 mt-1">{{ (feedbackFor(item.id).comment || '').length }} / 500</div>
+          </div>
         </div>
+
 
         <div class="flex flex-col sm:flex-row gap-3 pt-2">
           <button
             class="flex-1 bg-blue-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-blue-700 transition shadow-md disabled:bg-gray-400 disabled:cursor-not-allowed"
-            :disabled="!canSubmit"
+            :disabled="!canSubmit || isSubmitting"
             @click="submitFeedback"
           >
-            Submit Ratings
+            {{ isSubmitting ? 'Submitting...' : 'Submit Ratings' }}
           </button>
           <button
             class="flex-1 bg-gray-100 text-gray-800 py-3 px-6 rounded-xl font-semibold hover:bg-gray-200 transition"
             @click="goHome"
+            :disabled="isSubmitting"
           >
             Skip for now
           </button>
@@ -59,24 +79,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import StarRating from 'vue-star-rating'
-import NavigationBar from '@/components/client/NavigationBar.vue'
-import FooterPage from '@/components/client/FooterPage.vue'
-import { useRatingSessionStore } from '@/stores/ratingSession'
+import NavigationBar from '../../components/client/NavigationBar.vue'
+import FooterPage from '../../components/client/FooterPage.vue'
+import { useRatingSessionStore } from '../../stores/ratingSession'
+import { getCurrentUser, createRating } from '../../services/api'
 
 const router = useRouter()
 const ratingStore = useRatingSessionStore()
+const isSubmitting = ref(false)
 
 const items = computed(() => ratingStore.items)
 
 // feedbackMap keeps per-item rating and comment
-const feedbackMap = reactive<{ [key: number]: { rating: number } }>({})
+const feedbackMap = reactive<{ [key: number]: { rating: number; comment: string } }>({})
 
 const feedbackFor = (id: number) => {
   if (!feedbackMap[id]) {
-    feedbackMap[id] = { rating: 0 }
+    feedbackMap[id] = { rating: 0, comment: '' }
   }
   return feedbackMap[id]
 }
@@ -99,17 +121,57 @@ const canSubmit = computed(() => {
   return items.value.every((item) => (feedbackMap[item.id]?.rating || 0) > 0)
 })
 
-const submitFeedback = () => {
-  const payload = items.value.map((item) => ({
-    id: item.id,
-    rating: feedbackFor(item.id).rating || 0,
-  }))
+const submitFeedback = async () => {
+  try {
+    isSubmitting.value = true
 
-  // TODO: send to backend when available
-  console.log('Feedback submitted:', payload)
+    // Get current user
+    const currentUser = getCurrentUser()
+    if (!currentUser || !currentUser.id && !currentUser._id) {
+      alert('Please log in to submit ratings')
+      router.push('/auth/login')
+      return
+    }
 
-  ratingStore.clear()
-  router.push('/client/orders')
+    // Extract user ID as string (handle MongoDB ObjectId objects)
+    let userId = currentUser.id || currentUser._id || ''
+    if (typeof userId === 'object' && userId !== null) {
+      userId = (userId as any).$oid || String(userId)
+    }
+    userId = String(userId) // Ensure it's a string
+
+    // Submit each rating to API
+    const ratingPromises = items.value.map((item) => {
+      const productId = item.backend_id || String(item.id)
+      const rating = Math.round(feedbackFor(item.id).rating || 0) // Ensure integer
+      const review = feedbackFor(item.id).comment || '' // Ensure string (allow empty)
+
+      const payload = {
+        product_id: productId,
+        user_id: userId,
+        rating: rating, // 1-5 integer
+        review: review, // string (can be empty)
+      }
+
+      console.log('Submitting rating payload:', JSON.stringify(payload, null, 2))
+
+      return createRating(payload)
+    })
+
+    await Promise.all(ratingPromises)
+
+    alert('Ratings submitted successfully!')
+    ratingStore.clear()
+    router.push('/client/orders')
+  } catch (error: any) {
+    console.error('Error submitting ratings:', error)
+    const errorMessage = error?.response?.data?.message || 
+                         error?.message || 
+                         'Failed to connect to server. Please check if the backend is running on http://localhost:8080'
+    alert(errorMessage)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const goHome = () => {

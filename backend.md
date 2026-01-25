@@ -1,7 +1,8 @@
-use actix_web::{web, App, HttpResponse, HttpServer, middleware};
+use actix_web::{web, App, HttpResponse, HttpServer, middleware, HttpRequest};
 use actix_cors::Cors;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, Duration};
 use futures::stream::TryStreamExt;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use log::info;
 use mongodb::{
     bson::{doc, oid::ObjectId, to_bson},
@@ -48,6 +49,8 @@ pub struct User {
     pub country: String,
     #[serde(default = "default_gender")]
     pub gender: String,
+    #[serde(default = "default_status")]
+    pub status: String, // "active" or "blocked"
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -165,6 +168,8 @@ pub struct CreateUserRequest {
     pub country: String,
     #[serde(default = "default_gender")]
     pub gender: String,
+    #[serde(default = "default_status")]
+    pub status: String,
 }
 
 #[derive(Deserialize)]
@@ -180,6 +185,11 @@ pub struct UpdateUserRequest {
     pub role: Option<String>,
     pub country: Option<String>,
     pub gender: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    // Accept `active` as an alias for `status` (e.g. { "active": "blocked" } or { "active": true })
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active: Option<serde_json::Value>,
 }
 
 fn default_role() -> String {
@@ -192,6 +202,10 @@ fn default_country() -> String {
 
 fn default_gender() -> String {
     "other".to_string()
+}
+
+fn default_status() -> String {
+    "active".to_string()
 }
 
 #[derive(Deserialize)]
@@ -253,12 +267,106 @@ pub struct UpdateCartItemRequest {
     pub quantity: i32,
 }
 
+#[derive(Deserialize)]
+pub struct LoginRequest {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Deserialize)]
+pub struct RegisterRequest {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub full_name: String,
+    pub address: String,
+    pub phone: String,
+    #[serde(default)]
+    pub image_url: Option<String>,
+    #[serde(default = "default_country")]
+    pub country: String,
+    #[serde(default = "default_gender")]
+    pub gender: String,
+}
+
+#[derive(Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Claims {
+    pub sub: String,      // user_id
+    pub email: String,
+    pub role: String,
+    pub exp: i64,         // expiration time
+    pub iat: i64,         // issued at
+}
+
+#[derive(Serialize)]
+pub struct LoginResponse {
+    pub token: String,
+    pub user: UserResponse,
+}
+
+#[derive(Serialize, Clone)]
+pub struct UserResponse {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub full_name: String,
+    pub role: String,
+}
+
 // ============================================================
 // APP STATE
 // ============================================================
 
 pub struct AppState {
     pub client: Client,
+    pub jwt_secret: String,
+}
+
+// ============================================================
+// JWT HELPER FUNCTIONS
+// ============================================================
+
+fn generate_jwt(user_id: &str, email: &str, role: &str, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
+    let now = Utc::now();
+    let exp = now + Duration::hours(24);
+
+    let claims = Claims {
+        sub: user_id.to_string(),
+        email: email.to_string(),
+        role: role.to_string(),
+        exp: exp.timestamp(),
+        iat: now.timestamp(),
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(secret.as_bytes()),
+    )
+}
+
+fn verify_jwt(token: &str, secret: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+    decode::<Claims>(
+        token,
+        &DecodingKey::from_secret(secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map(|data| data.claims)
+}
+
+// Helper function to extract token from request
+fn extract_token(req: &HttpRequest) -> Option<String> {
+    req.headers()
+        .get("Authorization")
+        .and_then(|h| h.to_str().ok())
+        .and_then(|h| h.strip_prefix("Bearer "))
+        .map(|s| s.to_string())
 }
 
 // ============================================================
@@ -271,6 +379,326 @@ async fn health() -> HttpResponse {
         message: "Server is running".to_string(),
         data: None,
     })
+}
+
+// ============================================================
+// AUTHENTICATION HANDLERS
+// ============================================================
+
+async fn register(
+    data: web::Data<AppState>,
+    req: web::Json<RegisterRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    // Check if email already exists
+    if let Ok(Some(_)) = collection.find_one(doc! { "email": &req.email }, None).await {
+        return HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Email already registered".to_string(),
+            data: None,
+        });
+    }
+
+    // Check if username already exists
+    if let Ok(Some(_)) = collection.find_one(doc! { "username": &req.username }, None).await {
+        return HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Username already taken".to_string(),
+            data: None,
+        });
+    }
+
+    let user = User {
+        id: None,
+        username: req.username.clone(),
+        email: req.email.clone(),
+        password: req.password.clone(),
+        full_name: req.full_name.clone(),
+        address: req.address.clone(),
+        phone: req.phone.clone(),
+        image_url: req.image_url.clone(),
+        role: "customer".to_string(),
+        country: req.country.clone(),
+        gender: req.gender.clone(),
+        status: "active".to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+
+    match collection.insert_one(&user, None).await {
+        Ok(result) => {
+            let user_id = result.inserted_id.as_object_id().unwrap().to_hex();
+            
+            let token = match generate_jwt(&user_id, &user.email, &user.role, &data.jwt_secret) {
+                Ok(t) => t,
+                Err(e) => {
+                    return HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                        success: false,
+                        message: format!("Error generating token: {}", e),
+                        data: None,
+                    });
+                }
+            };
+
+            let response = LoginResponse {
+                token,
+                user: UserResponse {
+                    id: user_id,
+                    username: user.username,
+                    email: user.email,
+                    full_name: user.full_name,
+                    role: user.role,
+                },
+            };
+
+            HttpResponse::Created().json(ApiResponse {
+                success: true,
+                message: "User registered successfully".to_string(),
+                data: Some(response),
+            })
+        }
+        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+            success: false,
+            message: format!("Error creating user: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn login(
+    data: web::Data<AppState>,
+    req: web::Json<LoginRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    // Find user by email
+    let user = match collection.find_one(doc! { "email": &req.email }, None).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                success: false,
+                message: "Invalid email or password".to_string(),
+                data: None,
+            });
+        }
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                success: false,
+                message: format!("Error finding user: {}", e),
+                data: None,
+            });
+        }
+    };
+
+    // Check if user is blocked
+    if user.status == "blocked" {
+        return HttpResponse::Forbidden().json(ApiResponse::<String> {
+            success: false,
+            message: "Your account has been blocked".to_string(),
+            data: None,
+        });
+    }
+
+    // Simple password comparison
+    if req.password != user.password {
+        return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid email or password".to_string(),
+            data: None,
+        });
+    }
+
+    let user_id = user.id.unwrap().to_hex();
+    let token = match generate_jwt(&user_id, &user.email, &user.role, &data.jwt_secret) {
+        Ok(t) => t,
+        Err(e) => {
+            return HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                success: false,
+                message: format!("Error generating token: {}", e),
+                data: None,
+            });
+        }
+    };
+
+    let response = LoginResponse {
+        token,
+        user: UserResponse {
+            id: user_id,
+            username: user.username,
+            email: user.email,
+            full_name: user.full_name,
+            role: user.role,
+        },
+    };
+
+    HttpResponse::Ok().json(ApiResponse {
+        success: true,
+        message: "Login successful".to_string(),
+        data: Some(response),
+    })
+}
+
+async fn get_current_user(
+    data: web::Data<AppState>,
+    req: HttpRequest,
+) -> HttpResponse {
+    let token = match extract_token(&req) {
+        Some(t) => t,
+        None => {
+            return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                success: false,
+                message: "Missing authorization token".to_string(),
+                data: None,
+            });
+        }
+    };
+
+    let claims = match verify_jwt(&token, &data.jwt_secret) {
+        Ok(c) => c,
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                success: false,
+                message: "Invalid token".to_string(),
+                data: None,
+            });
+        }
+    };
+
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    match ObjectId::parse_str(&claims.sub) {
+        Ok(object_id) => {
+            match collection.find_one(doc! { "_id": object_id }, None).await {
+                Ok(Some(user)) => {
+                    let user_response = UserResponse {
+                        id: user.id.unwrap().to_hex(),
+                        username: user.username,
+                        email: user.email,
+                        full_name: user.full_name,
+                        role: user.role,
+                    };
+                    HttpResponse::Ok().json(ApiResponse {
+                        success: true,
+                        message: "User retrieved successfully".to_string(),
+                        data: Some(user_response),
+                    })
+                }
+                Ok(None) => HttpResponse::NotFound().json(ApiResponse::<String> {
+                    success: false,
+                    message: "User not found".to_string(),
+                    data: None,
+                }),
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error retrieving user: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid user ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+async fn change_password(
+    data: web::Data<AppState>,
+    req: HttpRequest,
+    body: web::Json<ChangePasswordRequest>,
+) -> HttpResponse {
+    let token = match extract_token(&req) {
+        Some(t) => t,
+        None => {
+            return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                success: false,
+                message: "Missing authorization token".to_string(),
+                data: None,
+            });
+        }
+    };
+
+    let claims = match verify_jwt(&token, &data.jwt_secret) {
+        Ok(c) => c,
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                success: false,
+                message: "Invalid token".to_string(),
+                data: None,
+            });
+        }
+    };
+
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    match ObjectId::parse_str(&claims.sub) {
+        Ok(object_id) => {
+            match collection.find_one(doc! { "_id": object_id }, None).await {
+                Ok(Some(user)) => {
+                    // Verify current password
+                    if body.current_password != user.password {
+                        return HttpResponse::Unauthorized().json(ApiResponse::<String> {
+                            success: false,
+                            message: "Current password is incorrect".to_string(),
+                            data: None,
+                        });
+                    }
+
+                    // Update password
+                    let update_doc = doc! { 
+                        "$set": { 
+                            "password": &body.new_password,
+                            "updated_at": to_bson(&Utc::now()).unwrap()
+                        } 
+                    };
+
+                    match collection.update_one(doc! { "_id": object_id }, update_doc, None).await {
+                        Ok(_) => {
+                            HttpResponse::Ok().json(ApiResponse {
+                                success: true,
+                                message: "Password changed successfully".to_string(),
+                                data: Some("Password updated".to_string()),
+                            })
+                        }
+                        Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                            success: false,
+                            message: format!("Error updating password: {}", e),
+                            data: None,
+                        }),
+                    }
+                }
+                Ok(None) => HttpResponse::NotFound().json(ApiResponse::<String> {
+                    success: false,
+                    message: "User not found".to_string(),
+                    data: None,
+                }),
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error retrieving user: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid user ID".to_string(),
+            data: None,
+        }),
+    }
 }
 
 // ============================================================
@@ -298,6 +726,86 @@ async fn get_all_products(data: web::Data<AppState>) -> HttpResponse {
         Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<Vec<Product>> {
             success: false,
             message: format!("Error retrieving products: {}", e),
+            data: None,
+        }),
+    }
+}
+
+async fn block_user(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => {
+            let update_doc = doc! { "$set": { "status": "blocked", "updated_at": to_bson(&Utc::now()).unwrap() } };
+            match collection.update_one(doc! { "_id": object_id }, update_doc, None).await {
+                Ok(result) => {
+                    if result.matched_count == 0 {
+                        HttpResponse::NotFound().json(ApiResponse::<String> {
+                            success: false,
+                            message: "User not found".to_string(),
+                            data: None,
+                        })
+                    } else {
+                        HttpResponse::Ok().json(ApiResponse {
+                            success: true,
+                            message: "User blocked successfully".to_string(),
+                            data: Some("User blocked".to_string()),
+                        })
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error blocking user: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid user ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+async fn activate_user(data: web::Data<AppState>, id: web::Path<String>) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<User>("users");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => {
+            let update_doc = doc! { "$set": { "status": "active", "updated_at": to_bson(&Utc::now()).unwrap() } };
+            match collection.update_one(doc! { "_id": object_id }, update_doc, None).await {
+                Ok(result) => {
+                    if result.matched_count == 0 {
+                        HttpResponse::NotFound().json(ApiResponse::<String> {
+                            success: false,
+                            message: "User not found".to_string(),
+                            data: None,
+                        })
+                    } else {
+                        HttpResponse::Ok().json(ApiResponse {
+                            success: true,
+                            message: "User activated successfully".to_string(),
+                            data: Some("User activated".to_string()),
+                        })
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error activating user: {}", e),
+                    data: None,
+                }),
+            }
+        }
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid user ID".to_string(),
             data: None,
         }),
     }
@@ -567,6 +1075,7 @@ async fn create_user(
         role: req.role.clone(),
         country: req.country.clone(),
         gender: req.gender.clone(),
+        status: req.status.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -632,6 +1141,23 @@ async fn update_user(
             }
             if let Some(gender) = &req.gender {
                 update_doc.insert("gender", gender.clone());
+            }
+            if let Some(status) = &req.status {
+                update_doc.insert("status", status.clone());
+            }
+            // support `active` alias: can be string "active"/"blocked" or boolean true/false
+            if let Some(active_val) = &req.active {
+                // Try to interpret the value
+                if active_val.is_string() {
+                    if let Some(s) = active_val.as_str() {
+                        let mapped = if s.eq_ignore_ascii_case("blocked") { "blocked" } else { "active" };
+                        update_doc.insert("status", mapped.to_string());
+                    }
+                } else if active_val.is_boolean() {
+                    let b = active_val.as_bool().unwrap_or(true);
+                    let mapped = if b { "active" } else { "blocked" };
+                    update_doc.insert("status", mapped.to_string());
+                }
             }
 
             update_doc.insert("updated_at", to_bson(&Utc::now()).unwrap());
@@ -863,6 +1389,79 @@ async fn delete_order(data: web::Data<AppState>, id: web::Path<String>) -> HttpR
                 data: None,
             }),
         },
+        Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
+            success: false,
+            message: "Invalid order ID".to_string(),
+            data: None,
+        }),
+    }
+}
+
+async fn update_order(
+    data: web::Data<AppState>,
+    id: web::Path<String>,
+    req: web::Json<UpdateOrderRequest>,
+) -> HttpResponse {
+    let db = data
+        .client
+        .database(&std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string()));
+    let collection = db.collection::<Order>("orders");
+
+    match ObjectId::parse_str(&id.into_inner()) {
+        Ok(object_id) => {
+            // build dynamic $set document
+            let mut set_doc = mongodb::bson::Document::new();
+            set_doc.insert("updated_at", to_bson(&Utc::now()).unwrap());
+
+            if let Some(ref status) = req.status {
+                set_doc.insert("status", status.clone());
+            }
+
+            if let Some(ref order_type) = req.order_type {
+                let ot = order_type.to_lowercase();
+                if ot != "shipping" && ot != "pickup" {
+                    return HttpResponse::BadRequest().json(ApiResponse::<String> {
+                        success: false,
+                        message: "order_type must be 'shipping' or 'pickup'".to_string(),
+                        data: None,
+                    });
+                }
+                set_doc.insert("order_type", ot);
+            }
+
+            if set_doc.is_empty() {
+                return HttpResponse::BadRequest().json(ApiResponse::<String> {
+                    success: false,
+                    message: "No update fields provided".to_string(),
+                    data: None,
+                });
+            }
+
+            let update_doc = doc! { "$set": set_doc };
+
+            match collection.update_one(doc! { "_id": object_id }, update_doc, None).await {
+                Ok(result) => {
+                    if result.matched_count == 0 {
+                        HttpResponse::NotFound().json(ApiResponse::<String> {
+                            success: false,
+                            message: "Order not found".to_string(),
+                            data: None,
+                        })
+                    } else {
+                        HttpResponse::Ok().json(ApiResponse {
+                            success: true,
+                            message: "Order updated successfully".to_string(),
+                            data: Some("Order updated".to_string()),
+                        })
+                    }
+                }
+                Err(e) => HttpResponse::InternalServerError().json(ApiResponse::<String> {
+                    success: false,
+                    message: format!("Error updating order: {}", e),
+                    data: None,
+                }),
+            }
+        }
         Err(_) => HttpResponse::BadRequest().json(ApiResponse::<String> {
             success: false,
             message: "Invalid order ID".to_string(),
@@ -1681,6 +2280,8 @@ async fn main() -> std::io::Result<()> {
     let mongo_uri = std::env::var("MONGODB_URI")
         .unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
     let database_name = std::env::var("DATABASE_NAME").unwrap_or_else(|_| "comic_store".to_string());
+    let jwt_secret = std::env::var("JWT_SECRET")
+        .unwrap_or_else(|_| "your-secret-key-change-this-in-production".to_string());
     let server_address = std::env::var("SERVER_ADDRESS").unwrap_or_else(|_| "127.0.0.1".to_string());
     let server_port = std::env::var("SERVER_PORT")
         .unwrap_or_else(|_| "8080".to_string())
@@ -1715,7 +2316,10 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
-    let app_state = web::Data::new(AppState { client });
+    let app_state = web::Data::new(AppState { 
+        client,
+        jwt_secret: jwt_secret.clone(),
+    });
     let bind_address = format!("{}:{}", server_address, server_port);
 
     info!("Starting server at http://{}", bind_address);
@@ -1731,35 +2335,47 @@ async fn main() -> std::io::Result<()> {
             )
             .wrap(middleware::Logger::default())
             .route("/health", web::get().to(health))
+            // Auth routes
+            .route("/api/auth/register", web::post().to(register))
+            .route("/api/auth/login", web::post().to(login))
+            .route("/api/auth/me", web::get().to(get_current_user))
+            .route("/api/auth/change-password", web::put().to(change_password))
+            // Product routes
             .route("/api/products", web::get().to(get_all_products))
             .route("/api/products/{id}", web::get().to(get_product_by_id))
             .route("/api/products", web::post().to(create_product))
             .route("/api/products/{id}", web::put().to(update_product))
             .route("/api/products/{id}", web::delete().to(delete_product))
+            // User routes
             .route("/api/users", web::get().to(get_all_users))
             .route("/api/users/{id}", web::get().to(get_user_by_id))
             .route("/api/users/{id}", web::put().to(update_user))
+            .route("/api/users/{id}/block", web::post().to(block_user))
+            .route("/api/users/{id}/activate", web::post().to(activate_user))
             .route("/api/users", web::post().to(create_user))
             .route("/api/users/{id}", web::delete().to(delete_user))
+            // Order routes
             .route("/api/orders", web::get().to(get_all_orders))
             .route("/api/orders/{id}", web::get().to(get_order_by_id))
             .route("/api/orders", web::post().to(create_order))
+            .route("/api/orders/{id}", web::put().to(update_order))
             .route("/api/orders/{id}", web::delete().to(delete_order))
+            // Rating routes
             .route("/api/ratings", web::get().to(get_all_ratings))
-            .route(
-                "/api/ratings/product/{product_id}",
-                web::get().to(get_ratings_by_product),
-            )
+            .route("/api/ratings/product/{product_id}", web::get().to(get_ratings_by_product))
             .route("/api/ratings", web::post().to(create_rating))
             .route("/api/ratings/{id}", web::delete().to(delete_rating))
+            // Category routes
             .route("/api/categories", web::get().to(get_all_categories))
             .route("/api/categories/{id}", web::get().to(get_category_by_id))
             .route("/api/categories", web::post().to(create_category))
             .route("/api/categories/{id}", web::delete().to(delete_category))
+            // Group routes
             .route("/api/groups", web::get().to(get_all_groups))
             .route("/api/groups/{id}", web::get().to(get_group_by_id))
             .route("/api/groups", web::post().to(create_group))
             .route("/api/groups/{id}", web::delete().to(delete_group))
+            // Cart routes
             .route("/api/carts/{user_id}", web::get().to(get_cart))
             .route("/api/carts/{user_id}/items", web::post().to(add_item_to_cart))
             .route("/api/carts/{user_id}/items/{product_id}", web::put().to(update_cart_item))

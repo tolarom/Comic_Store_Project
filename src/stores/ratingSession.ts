@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 export interface RateableItem {
   id: number
+  backend_id: string
   name: string
   image: string
   quantity: number

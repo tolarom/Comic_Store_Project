@@ -21,15 +21,49 @@ export const useCartStore = defineStore('cart', () => {
     }>,
   )
 
-  // initialize from localStorage
-  try {
-    const raw = localStorage.getItem('cartItems')
-    if (raw) cartItems.value = JSON.parse(raw)
-  } catch (e) {
-    console.warn('Failed to parse cartItems from localStorage', e)
+  // Helper function to get user-specific cart key
+  const getCartKey = () => {
+    const user = getCurrentUser()
+    const userId = user?._id || (user as any)?.id || 'guest'
+    return `cartItems_${userId}`
   }
 
-  const addToCart = (product: { id: number; backend_id?: string; name: string; price: number; image: string }) => {
+  // Initialize cart from localStorage for current user
+  const loadCart = () => {
+    try {
+      const cartKey = getCartKey()
+      const raw = localStorage.getItem(cartKey)
+      if (raw) {
+        cartItems.value = JSON.parse(raw)
+      } else {
+        cartItems.value = []
+      }
+    } catch (e) {
+      console.warn('Failed to parse cartItems from localStorage', e)
+      cartItems.value = []
+    }
+  }
+
+  // Save cart to localStorage for current user
+  const saveCart = () => {
+    try {
+      const cartKey = getCartKey()
+      localStorage.setItem(cartKey, JSON.stringify(cartItems.value))
+    } catch (e) {
+      console.warn('Failed to save cart to localStorage', e)
+    }
+  }
+
+  // Initialize cart on store creation
+  loadCart()
+
+  const addToCart = (product: {
+    id: number
+    backend_id?: string
+    name: string
+    price: number
+    image: string
+  }) => {
     const existing = cartItems.value.find((item) => item.id === product.id)
     if (existing) {
       existing.quantity++
@@ -45,10 +79,8 @@ export const useCartStore = defineStore('cart', () => {
       })
     }
 
-    // persist locally
-    try {
-      localStorage.setItem('cartItems', JSON.stringify(cartItems.value))
-    } catch {}
+    // Persist to user-specific localStorage
+    saveCart()
 
     // if user is authenticated and backend_id available, sync to backend
     const user = getCurrentUser()
@@ -65,15 +97,13 @@ export const useCartStore = defineStore('cart', () => {
     if (index > -1) {
       const [removed] = cartItems.value.splice(index, 1)
 
-      // persist locally
-      try {
-        localStorage.setItem('cartItems', JSON.stringify(cartItems.value))
-      } catch {}
+      // Persist to user-specific localStorage
+      saveCart()
 
       // sync removal
       const user = getCurrentUser()
       const uid = user ? user._id || (user as any).id : null
-      if (uid && removed.backend_id) {
+      if (removed && uid && removed.backend_id) {
         void apiRemoveCartItem(uid as string, removed.backend_id).catch((e) => {
           console.warn('Failed to sync removeFromCart to backend', e)
         })
@@ -86,10 +116,8 @@ export const useCartStore = defineStore('cart', () => {
     if (item && quantity > 0) {
       item.quantity = quantity
 
-      // persist locally
-      try {
-        localStorage.setItem('cartItems', JSON.stringify(cartItems.value))
-      } catch {}
+      // Persist to user-specific localStorage
+      saveCart()
 
       // sync
       const user = getCurrentUser()
@@ -106,20 +134,26 @@ export const useCartStore = defineStore('cart', () => {
     const item = cartItems.value.find((item) => item.id === id)
     if (item) {
       item.selected = selected
+      saveCart()
     }
   }
 
   const selectAllItems = (selected: boolean) => {
     cartItems.value.forEach((item) => (item.selected = selected))
+    saveCart()
   }
 
   const clearCart = () => {
     const prev = [...cartItems.value]
-    cartItems.value.length = 0
-
+    
+    // Remove user-specific cart from localStorage
     try {
-      localStorage.removeItem('cartItems')
+      const cartKey = getCartKey()
+      localStorage.removeItem(cartKey)
     } catch {}
+
+    // Clear in-memory cart
+    cartItems.value = []
 
     const user = getCurrentUser()
     const uid = user ? user._id || (user as any).id : null
@@ -128,6 +162,7 @@ export const useCartStore = defineStore('cart', () => {
         console.warn('Failed to clear cart on backend', e)
         // restore on failure
         cartItems.value = prev
+        saveCart()
       })
     }
   }
@@ -136,10 +171,8 @@ export const useCartStore = defineStore('cart', () => {
     const removed = cartItems.value.filter((item) => item.selected)
     cartItems.value = cartItems.value.filter((item) => !item.selected)
 
-    // persist locally
-    try {
-      localStorage.setItem('cartItems', JSON.stringify(cartItems.value))
-    } catch {}
+    // Persist to user-specific localStorage
+    saveCart()
 
     // sync removals with backend (fire-and-forget)
     const user = getCurrentUser()
@@ -187,6 +220,7 @@ export const useCartStore = defineStore('cart', () => {
     selectAllItems,
     clearCart,
     removeSelectedItems,
+    loadCart, // Export loadCart so it can be called on login
     subtotal,
     shipping,
     total,

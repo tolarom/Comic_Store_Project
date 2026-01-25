@@ -125,13 +125,23 @@
       </div>
 
       <!-- Icons -->
-      <div class="flex gap-4 text-lg">
+      <div class="flex gap-4 text-lg items-center">
         <div class="relative">
-          <button
-            @click="showProfileMenu = !showProfileMenu"
-            class="cursor-pointer focus:outline-none"
+          <button 
+            @click="showProfileMenu = !showProfileMenu" 
+            class="cursor-pointer focus:outline-none flex items-center gap-2"
           >
-            <i class="pi pi-user text-2xl"></i>
+            <div v-if="currentUser" class="flex items-center gap-2">
+              <img 
+                v-if="currentUser.image_url" 
+                :src="currentUser.image_url" 
+                alt="Profile" 
+                class="w-8 h-8 rounded-full object-cover border-2 border-white"
+              />
+              <i v-else class="pi pi-user text-2xl"></i>
+              <span class="text-sm font-medium hidden lg:block">{{ currentUser.full_name }}</span>
+            </div>
+            <i v-else class="pi pi-user text-2xl"></i>
           </button>
           <transition
             enter-active-class="transition duration-200 ease-out"
@@ -143,8 +153,12 @@
           >
             <div
               v-if="showProfileMenu"
-              class="absolute right-0 mt-[12px] bg-white text-black rounded-lg shadow-xl min-w-[160px] py-2 z-50 border border-gray-100 overflow-hidden"
+              class="absolute right-0 mt-[12px] bg-white text-black rounded-lg shadow-xl min-w-[200px] py-2 z-50 border border-gray-100 overflow-hidden"
             >
+              <div v-if="currentUser" class="px-4 py-3 border-b border-gray-100">
+                <p class="font-semibold text-sm">{{ currentUser.full_name }}</p>
+                <p class="text-xs text-gray-500">{{ currentUser.email }}</p>
+              </div>
               <router-link
                 to="/client/profile"
                 class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
@@ -169,6 +183,23 @@
                 <i class="pi pi-cog"></i>
                 Settings
               </router-link>
+              <button
+                v-if="isAuthenticated"
+                @click="handleLogout"
+                class="w-full text-left block px-4 py-2.5 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 border-t border-gray-100"
+              >
+                <i class="pi pi-sign-out"></i>
+                Logout
+              </button>
+              <router-link
+                v-else
+                to="/LoginPage"
+                class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2 border-t border-gray-100"
+                @click="showProfileMenu = false"
+              >
+                <i class="pi pi-sign-in"></i>
+                Login
+              </router-link>
             </div>
           </transition>
         </div>
@@ -188,20 +219,27 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useCartStore } from '@/stores/cart'
-import { useProductsStore } from '@/data/products'
-import { useScrollDirection } from '@/composables/useScrollDirection'
-import { useSearch } from '@/composables/useSearch'
+import { useCartStore } from '../../stores/cart'
+import { useProductsStore } from '../../data/products'
+import { useScrollDirection } from '../../composables/useScrollDirection'
+import { useSearch } from '../../composables/useSearch'
+import { useAuth } from '../../composables/useAuth'
 
 const cartStore = useCartStore()
 const productsStore = useProductsStore()
 const { setSearchQuery, clearSearchQuery } = useSearch()
+const { currentUser, isAuthenticated, logout } = useAuth()
 
 const query = ref('')
 const show = ref(false)
 const searchInput = ref(null)
 const highlightedIndex = ref(-1)
 const showProfileMenu = ref(false)
+
+function handleLogout() {
+  showProfileMenu.value = false
+  logout()
+}
 
 // Close dropdown on scroll, but keep navbar visible when search is active
 const closeDropdown = () => {

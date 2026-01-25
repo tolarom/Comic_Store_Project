@@ -13,14 +13,16 @@
         <p class="original-price" v-if="product.discount">${{ Number(product.price).toFixed(2) }}</p>
       </div>
       <div class="discount-badge" v-if="product.discount">{{ Number(product.discount).toFixed(2) }}% off</div>
-      <button class="add-to-cart-btn" @click.stop="addToCart">Add to Cart</button>
+      <router-link :to="`/client/products/${product.id}`" class="view-item-btn">View Item</router-link>
     </div>
-    <StarRating :rating="product.rating" :read-only="true" :increment="0.1" :star-size="starSize" />
+    <StarRating :rating="displayRating" :read-only="true" :increment="0.1" :star-size="starSize" />
   </div>
 </template>
 
 <script lang="ts">
+import { ref, watch, onMounted } from 'vue'
 import StarRating from 'vue-star-rating'
+import { getAverageRating } from '../../services/api'
 
 export default {
   components: { StarRating },
@@ -60,6 +62,39 @@ export default {
       },
     },
   },
+  setup(props) {
+    const loadedRating = ref(props.product?.rating || 0)
+
+    const loadRating = async () => {
+      try {
+        const productId = props.product?.backend_id || props.product?.id
+        if (!productId) return
+
+        const avgRating = await getAverageRating(String(productId))
+        loadedRating.value = avgRating || 0
+      } catch (error) {
+        console.warn('Failed to load rating for product:', error)
+        loadedRating.value = 0
+      }
+    }
+
+    // Load rating when component mounts
+    onMounted(() => {
+      loadRating()
+    })
+
+    // Reload rating if product changes
+    watch(
+      () => props.product?.id,
+      () => {
+        loadRating()
+      },
+    )
+
+    return {
+      loadedRating,
+    }
+  },
   computed: {
     discountedPrice() {
       const price = Number(this.product.price) || 0
@@ -74,11 +109,12 @@ export default {
       }
       return 20
     },
+    displayRating() {
+      return this.loadedRating || this.product?.rating || 0
+    },
   },
   methods: {
-    addToCart() {
-      this.$emit('add-to-cart', this.product)
-    },
+    // Methods removed - View Item now uses router-link
   },
 }
 </script>
@@ -208,6 +244,25 @@ export default {
   background: #0056b3;
 }
 
+.view-item-btn {
+  padding: 8px 12px;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background-color 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+.view-item-btn:hover {
+  background: #0056b3;
+}
+
 /* Mobile responsive styles */
 @media (max-width: 640px) {
   .product-card {
@@ -247,6 +302,11 @@ export default {
     font-size: 10px;
   }
 
+  .view-item-btn {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
   .discount-badge {
     font-size: 9px;
     padding: 1px 3px;
@@ -282,6 +342,11 @@ export default {
   }
 
   .add-to-cart-btn {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+
+  .view-item-btn {
     padding: 4px 6px;
     font-size: 9px;
   }

@@ -10,10 +10,11 @@
       <div class="w-full max-w-xl">
         <div class="text-center md:text-left mt-8 md:mt-0">
           <h1 class="text-4xl md:text-5xl font-lobster text-gray-900">Welcome To Our Store</h1>
-          <p class="text-gray-400 mt-2">Please enter your details</p>
+          <p class="text-gray-400 mt-2">Step {{ currentStep }} of 2</p>
         </div>
 
-        <form @submit.prevent="onSubmit" class="mt-8 space-y-6">
+        <!-- STEP 1: Basic Info -->
+        <form v-if="currentStep === 1" @submit.prevent="nextStep" class="mt-8 space-y-6">
           <!-- Error Message -->
           <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {{ error }}
@@ -84,9 +85,10 @@
 
           <button
             type="submit"
-            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-md font-semibold transition"
+            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-md font-semibold transition flex items-center justify-center gap-2"
           >
-            Sign Up
+            <span>Next</span>
+            <i class="pi pi-arrow-right"></i>
           </button>
 
           <p class="text-center text-sm text-gray-700">
@@ -96,6 +98,72 @@
             >
           </p>
         </form>
+
+        <!-- STEP 2: Additional Info -->
+        <form v-if="currentStep === 2" @submit.prevent="onSubmit" class="mt-8 space-y-6">
+          <!-- Error Message -->
+          <div v-if="error" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {{ error }}
+          </div>
+
+          <!-- Address -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Address</label>
+            <input
+              v-model="address"
+              type="text"
+              placeholder="Enter your address"
+              class="mt-2 w-full border border-gray-200 rounded-md px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none"
+              required
+            />
+          </div>
+
+          <!-- Country -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Country</label>
+            <input
+              v-model="country"
+              type="text"
+              placeholder="Enter your country"
+              class="mt-2 w-full border border-gray-200 rounded-md px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none"
+              required
+            />
+          </div>
+
+          <!-- Gender -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Gender</label>
+            <select
+              v-model="gender"
+              class="mt-2 w-full border border-gray-200 rounded-md px-4 py-3 focus:ring-2 focus:ring-indigo-400 outline-none"
+              required
+            >
+              <option value="">Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="flex gap-3">
+            <button
+              type="button"
+              @click="previousStep"
+              class="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 rounded-md font-semibold transition flex items-center justify-center gap-2"
+            >
+              <i class="pi pi-arrow-left"></i>
+              <span>Back</span>
+            </button>
+            <button
+              type="submit"
+              :disabled="isLoading"
+              class="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-md font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <i v-if="isLoading" class="pi pi-spin pi-spinner"></i>
+              <span>{{ isLoading ? 'Creating account...' : 'Sign Up' }}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   </div>
@@ -103,28 +171,33 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import poster1 from '@/assets/poster1.png'
+import { useAuth } from '../../composables/useAuth'
+const poster1 = '/src/assets/poster1.png'
 
-const router = useRouter()
-const email = ref('')
+const { signUp, isLoading } = useAuth()
+
+// Step tracking
+const currentStep = ref(1)
+
+// Step 1 fields
 const fullName = ref('')
 const phone = ref('')
+const email = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const showPassword = ref(false)
+
+// Step 2 fields
+const address = ref('')
+const country = ref('')
+const gender = ref('')
+
 const error = ref('')
 
-const onSubmit = () => {
+const nextStep = () => {
   error.value = ''
 
-  if (
-    !fullName.value ||
-    !phone.value ||
-    !email.value ||
-    !password.value ||
-    !confirmPassword.value
-  ) {
+  if (!fullName.value || !phone.value || !email.value || !password.value || !confirmPassword.value) {
     error.value = 'Please fill in all fields'
     return
   }
@@ -134,22 +207,42 @@ const onSubmit = () => {
     return
   }
 
-  // Save user info
-  localStorage.setItem('userEmail', email.value)
-  localStorage.setItem(
-    'userProfile',
-    JSON.stringify({
-      fullName: fullName.value,
-      email: email.value,
-      phoneNumber: phone.value,
-      gender: 'Not specified',
-      country: 'Not specified',
-    }),
-  )
-  localStorage.setItem('hasAccount', 'true')
+  if (password.value.length < 3) {
+    error.value = 'Password must be at least 3 characters long'
+    return
+  }
 
-  // Redirect to login
-  router.push('/LoginPage')
+  currentStep.value = 2
+}
+
+const previousStep = () => {
+  currentStep.value = 1
+  error.value = ''
+}
+
+const onSubmit = async () => {
+  error.value = ''
+
+  if (!address.value || !country.value || !gender.value) {
+    error.value = 'Please fill in all fields'
+    return
+  }
+
+  try {
+    await signUp({
+      username: email.value.split('@')[0],
+      email: email.value,
+      password: password.value,
+      full_name: fullName.value,
+      phone: phone.value,
+      address: address.value,
+      country: country.value,
+      gender: gender.value,
+    })
+    // Router push is handled in useAuth
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Registration failed. Please try again.'
+  }
 }
 </script>
 

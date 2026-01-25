@@ -119,16 +119,16 @@
 </template>
 
 <script setup lang="ts">
-import SearchBar from '@/components/client/SearchBar.vue'
-import ProductCard from '@/components/client/product-card.vue'
-import FooterPage from '@/components/client/FooterPage.vue'
+import SearchBar from '../../components/client/SearchBar.vue'
+import ProductCard from '../../components/client/product-card.vue'
+import FooterPage from '../../components/client/FooterPage.vue'
 import { ref, computed, watch, onMounted } from 'vue'
-import { useProductsStore, type ProductItem } from '@/data/products'
-import { useCartStore } from '@/stores/cart'
-import { useSearch } from '@/composables/useSearch'
+import { useProductsStore, type ProductItem } from '../../data/products'
+import { useCartStore } from '../../stores/cart'
+import { useSearch } from '../../composables/useSearch'
 import { useRoute, useRouter } from 'vue-router'
-import { getProductsByCategory, getAllCategories } from '@/services/api'
-import type { Category as ApiCategory } from '@/services/api'
+import { getProductsByCategory, getAllCategories, getAverageRating } from '../../services/api'
+import type { Category as ApiCategory } from '../../services/api'
 
 const cartStore = useCartStore()
 const { searchQuery } = useSearch()
@@ -149,6 +149,23 @@ const apiProducts = ref<ProductItem[]>([])
 
 // Categories for the select dropdown (keep full objects)
 const categories = ref<ApiCategory[]>([])
+
+// Load ratings for products
+const loadRatingsForProducts = async (productsToRate: ProductItem[]) => {
+  try {
+    for (const product of productsToRate) {
+      try {
+        const avgRating = await getAverageRating(product.backend_id || String(product.id || ''))
+        product.rating = avgRating
+      } catch (err) {
+        console.warn(`Failed to load rating for product ${product.backend_id ?? product.id}:`, err)
+        product.rating = product.rating || 0
+      }
+    }
+  } catch (err) {
+    console.warn('Error loading ratings:', err)
+  }
+}
 
 // Load categories for the filter select
 async function loadCategories() {
@@ -172,6 +189,9 @@ onMounted(async () => {
     
     if (productsStore.products.length === 0) {
       error.value = 'No products found. Backend may be down.'
+    } else {
+      // Load ratings for all products
+      await loadRatingsForProducts(productsStore.products)
     }
     
     loading.value = false
@@ -229,6 +249,7 @@ watch(
       selectedCategory.value = normalized
     }
   }
+ , { immediate: true }
 )
 
 const sortedProducts = computed<ProductItem[]>(() => {
@@ -370,6 +391,8 @@ async function fetchProductsForCategory(cat: string) {
       stock: p.stock || 0,
       sales: 0,
     }))
+    // Load ratings for category products
+    await loadRatingsForProducts(apiProducts.value)
     loading.value = false
   } catch (e) {
     console.error('Failed to fetch products for category', cat, e)

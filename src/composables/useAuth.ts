@@ -1,7 +1,12 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import type { User } from '@/services/api'
-import { register as apiRegister } from '@/services/api'
+import type { User, CreateUserRequest } from '@/services/api'
+import { 
+  register as apiRegister,
+  login as apiLogin,
+  logout as apiLogout,
+} from '@/services/api'
+import { useCartStore } from '@/stores/cart'
 
 // Auth state
 const currentUser = ref<User | null>(null)
@@ -17,19 +22,13 @@ export function useAuth() {
     const storedToken = localStorage.getItem('authToken')
     const storedUser = localStorage.getItem('user')
 
-    console.log('initializeAuth: storedToken:', storedToken)
-    console.log('initializeAuth: storedUser:', storedUser)
-
     if (storedToken) {
       authToken.value = storedToken
     }
 
     if (storedUser) {
       try {
-        const parsedUser = JSON.parse(storedUser)
-        console.log('initializeAuth: parsed user:', parsedUser)
-        currentUser.value = parsedUser
-        console.log('initializeAuth: currentUser.value set to:', currentUser.value)
+        currentUser.value = JSON.parse(storedUser)
       } catch (e) {
         console.error('Failed to parse stored user:', e)
         localStorage.removeItem('user')
@@ -37,73 +36,60 @@ export function useAuth() {
     }
   }
 
-  // Login - for now, create a simple client-side auth
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const login = async (email: string, _password: string) => {
+  // Login with backend API
+  const login = async (email: string, password: string) => {
     try {
       isLoading.value = true
       error.value = null
 
-      // Since backend doesn't have login endpoint yet,
-      // we'll create a simple client-side auth
-      // In production, backend should have /api/auth/login
+      const response = await apiLogin(email, password)
+      
+      authToken.value = response.token
+      currentUser.value = response.user
 
-      // Create a user object from email with better default values
-      const fakeToken = `token_${Date.now()}`
-      const username = email.split('@')[0] || 'user'
-      const fakeUser: User = {
-        email,
-        username,
-        full_name: username.charAt(0).toUpperCase() + username.slice(1), // Capitalize first letter
-        address: '123 Main Street',
-        phone: '+1 (555) 123-4567',
-        role: 'customer',
+      // Load user-specific cart
+      const cartStore = useCartStore()
+      cartStore.loadCart()
+
+      // Redirect based on role
+      if (response.user.role === 'admin') {
+        await router.push({ name: 'Dashboard' })
+      } else {
+        await router.push({ name: 'Homeview' })
       }
-
-      console.log('Login: Saving user to localStorage:', fakeUser)
-
-      // Store in localStorage
-      localStorage.setItem('authToken', fakeToken)
-      localStorage.setItem('user', JSON.stringify(fakeUser))
-
-      authToken.value = fakeToken
-      currentUser.value = fakeUser
-
-      console.log('Login: Auth state updated. currentUser:', currentUser.value)
-
-      // Redirect to home
-      await router.push({ name: 'Homeview' })
-      return fakeUser
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Login failed'
-      throw err
+      
+      return response.user
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Login failed'
+      error.value = errorMsg
+      throw new Error(errorMsg)
     } finally {
       isLoading.value = false
     }
   }
 
-  // Register - call backend API
-  const signUp = async (userData: User & { password: string }) => {
+  // Register with backend API
+  const signUp = async (userData: CreateUserRequest) => {
     try {
       isLoading.value = true
       error.value = null
 
       const newUser = await apiRegister(userData)
 
-      // Auto-login after registration
-      const fakeToken = `token_${Date.now()}`
-      localStorage.setItem('authToken', fakeToken)
-      localStorage.setItem('user', JSON.stringify(newUser))
+      // Clear any existing auth data before redirecting to login
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('user')
+      authToken.value = null
+      currentUser.value = null
 
-      authToken.value = fakeToken
-      currentUser.value = newUser
-
-      // Redirect to home
-      await router.push({ name: 'Homeview' })
+      // Redirect to login page after successful signup
+      await router.push({ name: 'LoginPage' })
+      
       return newUser
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Registration failed'
-      throw err
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Registration failed'
+      error.value = errorMsg
+      throw new Error(errorMsg)
     } finally {
       isLoading.value = false
     }
@@ -111,11 +97,25 @@ export function useAuth() {
 
   // Logout
   const logout = () => {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
+    // Clear user cart
+    const cartStore = useCartStore()
+    cartStore.clearCart()
+    
+    // Clear auth
+    apiLogout()
     authToken.value = null
     currentUser.value = null
+    
+    // Load guest cart
+    cartStore.loadCart()
+    
     router.push({ name: 'LoginPage' })
+  }
+
+  // Update current user profile
+  const updateProfile = (updatedUser: User) => {
+    currentUser.value = updatedUser
+    localStorage.setItem('user', JSON.stringify(updatedUser))
   }
 
   // Computed properties
@@ -138,5 +138,6 @@ export function useAuth() {
     signUp,
     logout,
     initializeAuth,
+    updateProfile,
   }
 }

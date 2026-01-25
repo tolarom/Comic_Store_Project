@@ -16,6 +16,16 @@
           <h2 class="text-xl font-bold text-gray-900 mt-1">Change Password</h2>
         </div>
 
+        <!-- Error Message -->
+        <div v-if="passwordError" class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {{ passwordError }}
+        </div>
+
+        <!-- Success Message -->
+        <div v-if="passwordMessage" class="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+          {{ passwordMessage }}
+        </div>
+
         <div class="space-y-5">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">Current Password</label>
@@ -51,15 +61,18 @@
         <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
           <button
             @click="resetPasswordForm"
-            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+            :disabled="isUpdatingPassword"
+            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Clear
           </button>
           <button
             @click="updatePassword"
-            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+            :disabled="isUpdatingPassword"
+            class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Update Password
+            <i v-if="isUpdatingPassword" class="pi pi-spin pi-spinner"></i>
+            <span>{{ isUpdatingPassword ? 'Updating...' : 'Update Password' }}</span>
           </button>
         </div>
       </div>
@@ -109,10 +122,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
 import NavigationBar from '@/components/client/NavigationBar.vue'
 import FooterPage from '@/components/client/FooterPage.vue'
+import { blockUser, deleteUser, changePassword } from '@/services/api'
 
 const router = useRouter()
+const { currentUser, logout } = useAuth()
 
 const passwordForm = ref({
   current: '',
@@ -120,64 +136,86 @@ const passwordForm = ref({
   confirm: '',
 })
 
+const isUpdatingPassword = ref(false)
+const passwordMessage = ref('')
+const passwordError = ref('')
+
 const resetPasswordForm = () => {
   passwordForm.value = {
     current: '',
     newPassword: '',
     confirm: '',
   }
+  passwordMessage.value = ''
+  passwordError.value = ''
 }
 
-const updatePassword = () => {
+const updatePassword = async () => {
+  passwordError.value = ''
+  passwordMessage.value = ''
+
   if (!passwordForm.value.current || !passwordForm.value.newPassword || !passwordForm.value.confirm) {
-    alert('Please fill in all password fields')
+    passwordError.value = 'Please fill in all password fields'
     return
   }
 
   if (passwordForm.value.newPassword !== passwordForm.value.confirm) {
-    alert('New passwords do not match')
+    passwordError.value = 'New passwords do not match'
     return
   }
 
-  if (passwordForm.value.newPassword.length < 8) {
-    alert('Password must be at least 8 characters long')
+  if (passwordForm.value.newPassword.length < 3) {
+    passwordError.value = 'Password must be at least 3 characters long'
     return
   }
 
-  // Here you would typically make an API call to update the password
-  console.log('Updating password...')
-  alert('Password updated successfully!')
-  resetPasswordForm()
+  try {
+    isUpdatingPassword.value = true
+    const message = await changePassword(passwordForm.value.current, passwordForm.value.newPassword)
+    passwordMessage.value = message
+    resetPasswordForm()
+    alert('Password changed successfully. Please log in again.')
+  } catch (err: any) {
+    passwordError.value = err.message || 'Failed to change password. Please try again.'
+  } finally {
+    isUpdatingPassword.value = false
+  }
 }
 
-const disableAccount = () => {
+const disableAccount = async () => {
   const confirmation = confirm(
     'Are you sure you want to disable your account? You can reactivate it anytime by logging in.',
   )
-  if (confirmation) {
-    console.log('Disabling account...')
-    alert('Your account has been disabled. You can reactivate it by logging in.')
-    // Here you would typically make an API call to disable the account
-    // Then redirect to home or login
-    router.push('/')
+  if (confirmation && currentUser.value?.id) {
+    try {
+      await blockUser(currentUser.value.id)
+      alert('Your account has been disabled. You can reactivate it by logging in.')
+      logout()
+      router.push('/loginPage')
+    } catch (err: any) {
+      alert(err?.message || 'Failed to disable account')
+    }
   }
 }
 
-const deleteAccount = () => {
+const deleteAccount = async () => {
   const confirmation = prompt(
     'This action cannot be undone. All your data will be permanently deleted. Type "DELETE MY ACCOUNT" to confirm:',
   )
-  if (confirmation === 'DELETE MY ACCOUNT') {
-    console.log('Deleting account...')
-    
-    // Clear authentication data
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    localStorage.removeItem('userRole')
-    
-    alert('Your account has been permanently deleted.')
-    // Redirect to home
-    router.push('/')
+  if (confirmation === 'DELETE MY ACCOUNT' && currentUser.value?.id) {
+    try {
+      await deleteUser(currentUser.value.id)
+      
+      // Clear authentication data
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('user')
+      localStorage.removeItem('userRole')
+      
+      alert('Your account has been permanently deleted.')
+      router.push('/loginPage')
+    } catch (err: any) {
+      alert(err?.message || 'Failed to delete account')
+    }
   } else if (confirmation !== null) {
     alert('Account deletion cancelled. Please type the exact phrase to confirm.')
   }

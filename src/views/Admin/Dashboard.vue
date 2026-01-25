@@ -111,24 +111,18 @@
 import { onMounted, onBeforeUnmount, ref } from 'vue'
 import Chart from 'chart.js/auto'
 import AdminNav from '../../components/Admin/NavigationBar.vue'
-import { useUsersStore } from '../../data/users'
+import { getAllOrders, getAllProducts, getAllUsers } from '../../services/api'
 
 export default {
   name: 'AdminDashboard',
-  components: {
-    AdminNav,
-  },
+  components: { AdminNav },
   setup() {
-    const usersStore = useUsersStore()
-    const activeUsersCount = usersStore.users.filter((user) => user.status === 'Active').length
-    const itemsSoldChart = ref(null)
-    let itemsSoldChartInstance = null
+    const itemsSoldChart = ref<HTMLCanvasElement | null>(null)
+    let itemsSoldChartInstance: any = null
 
-    const topProducts = [
-      { id: 1, name: 'Comic Book', sales: 168, revenue: 5038.32, change: 12.5 },
-      { id: 2, name: 'Gojo T-Shirt', sales: 150, revenue: 10498.5, change: 8.3 },
-      { id: 3, name: 'Anime Figures', sales: 100, revenue: 13836.0, change: -3.2 },
-    ]
+    const stats = ref({ totalRevenue: 0, activeUsers: 0 })
+    const recentOrders = ref<any[]>([])
+    const topProducts = ref<Array<{ name: string; sales: number; revenue: number }>>([])
 
     const initializeCharts = () => {
       if (itemsSoldChartInstance) itemsSoldChartInstance.destroy()
@@ -137,86 +131,173 @@ export default {
         itemsSoldChartInstance = new Chart(itemsSoldChart.value, {
           type: 'bar',
           data: {
-            labels: topProducts.map(p => p.name),
+            labels: topProducts.value.map((p) => p.name),
             datasets: [
               {
                 label: 'Units Sold',
-                data: topProducts.map(p => p.sales),
-                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b'],
+                data: topProducts.value.map((p) => p.sales),
+                backgroundColor: topProducts.value.map((_, i) => ['#3b82f6', '#10b981', '#f59e0b'][i % 3]),
                 borderRadius: 6,
                 borderSkipped: false,
-              }
-            ]
+              },
+            ],
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: 'bottom'
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-              }
-            }
-          }
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } },
+          },
         })
       }
     }
 
+    const loadData = async () => {
+      try {
+        const [ordersResp, productsResp, usersResp] = await Promise.all([
+          getAllOrders().catch(() => []),
+          getAllProducts().catch(() => []),
+          getAllUsers().catch(() => []),
+        ])
+
+        const orders = ordersResp || []
+        const products = productsResp || []
+        const users = usersResp || []
+
+        // Create product ID -> Product lookup map
+        const productMap: Record<string, any> = {}
+        products.forEach((p: any) => {
+          // Handle _id that might be object or string
+          let id = ''
+          if (p._id) {
+            id = typeof p._id === 'object' ? (p._id.$oid || String(p._id)) : String(p._id)
+          } else if (p.id) {
+            id = typeof p.id === 'object' ? (p.id.$oid || String(p.id)) : String(p.id)
+          }
+          if (id) {
+            productMap[id] = p
+          }
+        })
+
+        // Create user ID -> Name lookup map
+        const userMap: Record<string, string> = {}
+        users.forEach((u: any) => {
+          let id = ''
+          if (u._id) {
+            id = typeof u._id === 'object' ? (u._id.$oid || String(u._id)) : String(u._id)
+          } else if (u.id) {
+            id = typeof u.id === 'object' ? (u.id.$oid || String(u.id)) : String(u.id)
+          }
+          const name = u.full_name || u.username || u.email || 'Unknown User'
+          if (id) {
+            userMap[id] = name
+          }
+        })
+
+        // total revenue
+        stats.value.totalRevenue = orders.reduce((acc: number, o: any) => acc + (o.total_amount || o.total_price || 0), 0)
+
+        // active users
+        stats.value.activeUsers = users.filter((u: any) => {
+          const s = String(u.status || u.active || '').toLowerCase()
+          return s === 'active' || s === 'true'
+        }).length
+
+        // recent orders (most recent 5)
+        const sorted = [...orders].sort((a: any, b: any) => {
+          const da = new Date(a.created_at || a.createdAt || 0).getTime()
+          const db = new Date(b.created_at || b.createdAt || 0).getTime()
+          return db - da
+        })
+
+        recentOrders.value = sorted.slice(0, 5).map((o: any) => {
+          // Get items from order
+          const items = o.items || o.products || []
+          const firstItem = items[0]
+          
+          // Get product name from first item
+          let productDisplay = 'No items'
+          if (firstItem) {
+            const productId = String(firstItem.product_id || '')
+            const product = productMap[productId]
+            const productName = product ? (product.title || 'Unknown Product') : 'Unknown Product'
+            productDisplay = items.length > 1 ? `${productName} (+${items.length - 1} more)` : productName
+          }
+
+          // Get customer name
+          const userId = String(o.user_id || '')
+          const customerName = userMap[userId] || 'Unknown Customer'
+
+          return {
+            id: o._id || o.id,
+            customer: customerName,
+            product: productDisplay,
+            amount: ((o.total_amount || o.total_price) || 0).toFixed(2),
+            status: o.status || 'pending',
+          }
+        })
+
+        // top products (aggregate from orders)
+        const prodMap: Record<string, { name: string; sales: number; revenue: number }> = {}
+        orders.forEach((o: any) => {
+          const items = o.items || o.products || []
+          items.forEach((it: any) => {
+            const productId = String(it.product_id || '')
+            const product = productMap[productId]
+            const name = product ? (product.title || 'Unknown Product') : 'Unknown Product'
+            const qty = Number(it.quantity || 1)
+            const price = Number(it.price || 0)
+            
+            if (!prodMap[name]) prodMap[name] = { name, sales: 0, revenue: 0 }
+            prodMap[name].sales += qty
+            prodMap[name].revenue += qty * price
+          })
+        })
+
+        const prodList = Object.values(prodMap)
+          .sort((a, b) => {
+            // Sort by sales first (descending), then by revenue (descending)
+            if (b.sales !== a.sales) {
+              return b.sales - a.sales
+            }
+            return b.revenue - a.revenue
+          })
+          .slice(0, 5)
+        topProducts.value = prodList
+
+        console.log('Dashboard - Top Products:', prodList)
+
+        // initialize chart after data is ready
+        setTimeout(() => initializeCharts(), 50)
+      } catch (e) {
+        // Failed to load dashboard data
+      }
+    }
+
     onMounted(() => {
-      setTimeout(() => {
-        initializeCharts()
-      }, 100)
+      loadData()
     })
 
     onBeforeUnmount(() => {
       if (itemsSoldChartInstance) itemsSoldChartInstance.destroy()
     })
 
+    const formatNumber = (num: number) => {
+      return Number(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    }
+
+    const getStatusClass = (status: string) => {
+      return status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+    }
+
     return {
       itemsSoldChart,
-      stats: {
-        totalRevenue: 45231.89,
-        activeUsers: activeUsersCount,
-      },
-      recentOrders: [
-        {
-          id: 1,
-          customer: 'John Doe',
-          product: 'Comic Book',
-          amount: '29.99',
-          status: 'completed',
-        },
-        {
-          id: 2,
-          customer: 'Jane Smith',
-          product: 'Gojo T-Shirt',
-          amount: '69.99',
-          status: 'pending',
-        },
-        {
-          id: 3,
-          customer: 'Bob Johnson',
-          product: 'Anime Figures',
-          amount: '138.36',
-          status: 'completed',
-        },
-      ],
+      stats,
+      recentOrders,
       topProducts,
+      formatNumber,
+      getStatusClass,
     }
-  },
-  methods: {
-    formatNumber(num) {
-      return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    },
-    getStatusClass(status) {
-      return status === 'completed'
-        ? 'bg-green-100 text-green-700'
-        : 'bg-yellow-100 text-yellow-700'
-    },
   },
 }
 </script>

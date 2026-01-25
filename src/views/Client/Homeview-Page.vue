@@ -79,6 +79,7 @@ const addToCart = (product: any) => {
     : product.price
   cartStore.addToCart({
     id: product.id,
+    backend_id: product.backend_id,
     name: product.title,
     price: discountedPrice,
     image: product.image,

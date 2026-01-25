@@ -96,10 +96,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import NavigationBar from '@/components/client/NavigationBar.vue'
-import CartItem from '@/components/client/cart-item.vue'
-import { useCartStore } from '@/stores/cart'
-import FooterPage from '@/components/client/FooterPage.vue'
+import NavigationBar from '../../components/client/NavigationBar.vue'
+import CartItem from '../../components/client/cart-item.vue'
+import { useCartStore } from '../../stores/cart'
+import FooterPage from '../../components/client/FooterPage.vue'
 
 const cartStore = useCartStore()
 

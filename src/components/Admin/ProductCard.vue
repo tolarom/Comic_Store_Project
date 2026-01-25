@@ -120,6 +120,7 @@ const handleDelete = () => {
   emit('delete-product', props.product)
   closeMenu()
 }
+
 </script>
 
 <style scoped>

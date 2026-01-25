@@ -51,6 +51,18 @@
           <span v-if="product.discount" class="ml-3 text-sm text-green-600">({{ Number(product.discount) }}% off)</span>
         </div>
 
+        <!-- Stock Status -->
+        <div class="mt-4 flex items-center gap-2">
+          <span class="font-semibold text-gray-700">Availability:</span>
+          <span 
+            v-if="product?.stock !== undefined && product.stock !== null && product.stock > 0"
+            class="text-green-600 font-semibold"
+          >
+            In Stock ({{ product.stock }} available)
+          </span>
+          <span v-else class="text-red-600 font-semibold">Out of Stock</span>
+        </div>
+
         <hr class="my-8 border-gray-300" />
 
         <!-- Description -->
@@ -62,20 +74,35 @@
         <div class="mt-8 flex items-center gap-6">
           <p class="font-semibold text-lg">Quantity:</p>
           <div class="flex items-center border-2 border-gray-300 rounded-md">
-            <button class="px-5 py-3 hover:bg-gray-100 transition" @click="qty > 1 && qty--">
+            <button 
+              class="px-5 py-3 hover:bg-gray-100 transition" 
+              @click="qty > 1 && qty--"
+              :disabled="qty <= 1"
+            >
               −
             </button>
             <span class="px-6 py-3 border-x-2 border-gray-300 font-medium">{{ qty }}</span>
-            <button class="px-5 py-3 hover:bg-gray-100 transition" @click="qty++">+</button>
+            <button 
+              class="px-5 py-3 hover:bg-gray-100 transition" 
+              @click="qty < (product?.stock || 0) && qty++"
+              :disabled="!product?.stock || qty >= product.stock"
+            >
+              +
+            </button>
           </div>
+          <span v-if="product?.stock" class="text-sm text-gray-600">Max: {{ product.stock }}</span>
         </div>
 
         <!-- Add to Cart Button -->
         <button
-          class="mt-10 w-full bg-indigo-600 text-white py-5 rounded-lg font-bold text-lg hover:bg-indigo-700 transition shadow-md"
+          :disabled="!product?.stock || product.stock === 0 || product.stock === undefined"
+          class="mt-10 w-full py-5 rounded-lg font-bold text-lg transition shadow-md"
+          :class="product?.stock && product.stock > 0 && product.stock !== undefined
+            ? 'bg-indigo-600 text-white hover:bg-indigo-700 cursor-pointer' 
+            : 'bg-gray-400 text-gray-100 cursor-not-allowed'"
           @click="onAddToCart"
         >
-          ADD TO CART
+          {{ product?.stock && product.stock > 0 && product.stock !== undefined ? 'ADD TO CART' : 'OUT OF STOCK' }}
         </button>
       </div>
       
@@ -108,12 +135,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useProductsStore } from '@/data/products'
-import { useCartStore } from '@/stores/cart'
-import FooterPage from '@/components/client/FooterPage.vue'
-import NavigationBar from '@/components/client/NavigationBar.vue'
+import { useProductsStore } from '../../data/products'
+import { useCartStore } from '../../stores/cart'
+import FooterPage from '../../components/client/FooterPage.vue'
+import NavigationBar from '../../components/client/NavigationBar.vue'
 import StarRating from 'vue-star-rating'
-import { getRatingsByProduct } from '@/services/api'
+import { getRatingsByProduct } from '../../services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,6 +176,20 @@ const displayPrice = computed(() => {
 const onAddToCart = () => {
   const p = product.value
   if (!p) return
+  
+  // Check if product is in stock
+  if (!p.stock || p.stock <= 0) {
+    alert('This product is out of stock')
+    return
+  }
+  
+  // Check if requested quantity exceeds stock
+  if (qty.value > p.stock) {
+    alert(`Only ${p.stock} item${p.stock === 1 ? '' : 's'} available`)
+    qty.value = p.stock
+    return
+  }
+  
   const price = p.discount ? p.price * (1 - p.discount / 100) : p.price
 
   // Add item(s) to cart based on quantity
@@ -158,6 +199,7 @@ const onAddToCart = () => {
 
   // Reset quantity after adding
   qty.value = 1
+  alert(`${qty.value === 1 ? '1 item' : qty.value + ' items'} added to cart!`)
 }
 
 // --- Reviews state & actions ---

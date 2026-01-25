@@ -1,5 +1,5 @@
 <template>
-  <div><Header /></div>
+  <div><NavigationBar /></div>
   <div class="min-h-screen bg-gray-50 p-6 ml-[250px] mt-10">
     <div class="mx-auto">
       <!-- Breadcrumb -->
@@ -59,113 +59,40 @@
                   />
                 </div>
               </div>
+
+              <!-- Error Message -->
+              <div v-if="passwordError" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+                {{ passwordError }}
+              </div>
+
+              <!-- Success Message -->
+              <div v-if="passwordMessage" class="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+                {{ passwordMessage }}
+              </div>
             </div>
 
             <div class="flex justify-end gap-3 pt-6 border-t border-gray-200 mt-6">
               <button
                 @click="resetPasswordForm"
-                class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                :disabled="isUpdatingPassword"
+                class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Clear
               </button>
               <button
                 @click="updatePassword"
-                class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                :disabled="isUpdatingPassword"
+                class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                Update Password
+                <i v-if="isUpdatingPassword" class="pi pi-spin pi-spinner"></i>
+                <span>{{ isUpdatingPassword ? 'Updating...' : 'Update Password' }}</span>
               </button>
             </div>
           </div>
         </div>
 
-        <!-- Right column: account settings + danger -->
+        <!-- Right column: danger zone -->
         <div class="space-y-6">
-          <!-- Account Settings -->
-          <div class="bg-white rounded-lg shadow-sm p-8">
-            <div class="flex items-center justify-between mb-6 pb-4 border-b border-gray-200">
-              <div>
-                <p class="text-xs uppercase tracking-wide text-gray-500">Preferences</p>
-                <h2 class="text-xl font-bold text-gray-900">Account Settings</h2>
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <div class="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h3 class="font-semibold text-gray-900">Email Notifications</h3>
-                  <p class="text-sm text-gray-600">Updates about activity on your account</p>
-                </div>
-                <button
-                  @click="toggleSetting('emailNotifications')"
-                  :class="[
-                    'relative w-14 h-7 rounded-full transition-colors',
-                    accountSettings.emailNotifications ? 'bg-blue-600' : 'bg-gray-300',
-                  ]"
-                >
-                  <span
-                    :class="[
-                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                      accountSettings.emailNotifications ? 'right-0.5' : 'left-0.5',
-                    ]"
-                  ></span>
-                </button>
-              </div>
-
-              <div class="flex items-center justify-between py-3 border-b border-gray-100">
-                <div>
-                  <h3 class="font-semibold text-gray-900">Marketing Emails</h3>
-                  <p class="text-sm text-gray-600">Product news and feature updates</p>
-                </div>
-                <button
-                  @click="toggleSetting('marketingEmails')"
-                  :class="[
-                    'relative w-14 h-7 rounded-full transition-colors',
-                    accountSettings.marketingEmails ? 'bg-blue-600' : 'bg-gray-300',
-                  ]"
-                >
-                  <span
-                    :class="[
-                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                      accountSettings.marketingEmails ? 'right-0.5' : 'left-0.5',
-                    ]"
-                  ></span>
-                </button>
-              </div>
-
-              <div class="flex items-center justify-between py-3">
-                <div>
-                  <h3 class="font-semibold text-gray-900">Two-Factor Authentication</h3>
-                  <p class="text-sm text-gray-600">Add an extra layer of security</p>
-                </div>
-                <button
-                  @click="toggleSetting('twoFactorAuth')"
-                  :class="[
-                    'relative w-14 h-7 rounded-full transition-colors',
-                    accountSettings.twoFactorAuth ? 'bg-blue-600' : 'bg-gray-300',
-                  ]"
-                >
-                  <span
-                    :class="[
-                      'absolute top-0.5 w-6 h-6 bg-white rounded-full transition-transform',
-                      accountSettings.twoFactorAuth ? 'right-0.5' : 'left-0.5',
-                    ]"
-                  ></span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Logout Button -->
-            <div class="mt-6 pt-6 border-t border-gray-200">
-              <button
-                @click="handleLogout"
-                class="w-full px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white rounded-lg transition-colors flex items-center justify-center gap-2 font-medium"
-              >
-                <i class="pi pi-sign-out"></i>
-                Logout
-              </button>
-            </div>
-          </div>
-
           <!-- Danger Zone -->
           <div class="bg-white rounded-lg shadow-sm p-8 border border-red-200">
             <div class="flex items-center justify-between mb-6 pb-4 border-b border-red-100">
@@ -178,27 +105,27 @@
             <div class="space-y-4">
               <div class="flex items-center justify-between py-3 border-b border-gray-100">
                 <div>
-                  <h3 class="font-semibold text-gray-900">Deactivate Account</h3>
-                  <p class="text-sm text-gray-600">Temporarily disable your account</p>
+                  <h3 class="font-semibold text-gray-900">Disable Account</h3>
+                  <p class="text-sm text-gray-600">Temporarily disable your account. You can reactivate it anytime.</p>
                 </div>
                 <button
-                  @click="deactivateAccount"
-                  class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors"
+                  @click="disableAccount"
+                  class="px-4 py-2 border border-yellow-300 text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors font-medium whitespace-nowrap"
                 >
-                  Deactivate
+                  Disable
                 </button>
               </div>
 
               <div class="flex items-center justify-between py-3">
                 <div>
                   <h3 class="font-semibold text-gray-900">Delete Account</h3>
-                  <p class="text-sm text-gray-600">Permanently delete your account and data</p>
+                  <p class="text-sm text-gray-600">Permanently delete your account and all associated data. This cannot be undone.</p>
                 </div>
                 <button
                   @click="deleteAccount"
-                  class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                  class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium whitespace-nowrap"
                 >
-                  Delete Account
+                  Delete
                 </button>
               </div>
             </div>
@@ -209,34 +136,31 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import Header from '../../components/Admin/NavigationBar.vue'
+import { useAuth } from '../../composables/useAuth'
+import NavigationBar from '../../components/Admin/NavigationBar.vue'
+import { blockUser, deleteUser, changePassword } from '../../services/api'
 
 export default {
   name: 'SettingsPage',
   components: {
-    Header,
+    NavigationBar,
   },
   setup() {
     const router = useRouter()
+    const { currentUser, logout } = useAuth()
     
-    const accountSettings = ref({
-      emailNotifications: true,
-      marketingEmails: true,
-      twoFactorAuth: false,
-    })
-
     const passwordForm = ref({
       current: '',
       newPassword: '',
       confirm: '',
     })
 
-    const toggleSetting = (setting) => {
-      accountSettings.value[setting] = !accountSettings.value[setting]
-    }
+    const isUpdatingPassword = ref(false)
+    const passwordMessage = ref('')
+    const passwordError = ref('')
 
     const handleLogout = () => {
       if (confirm('Are you sure you want to logout?')) {
@@ -252,55 +176,100 @@ export default {
 
     const resetPasswordForm = () => {
       passwordForm.value = { current: '', newPassword: '', confirm: '' }
+      passwordMessage.value = ''
+      passwordError.value = ''
     }
 
-    const updatePassword = () => {
+    const updatePassword = async () => {
+      passwordError.value = ''
+      passwordMessage.value = ''
+
       if (
         !passwordForm.value.current ||
         !passwordForm.value.newPassword ||
         !passwordForm.value.confirm
       ) {
-        alert('Please fill in all password fields')
+        passwordError.value = 'Please fill in all password fields'
         return
       }
       if (passwordForm.value.newPassword !== passwordForm.value.confirm) {
-        alert('New passwords do not match')
+        passwordError.value = 'New passwords do not match'
         return
       }
 
-      // API call to update password
-      console.log('Updating password')
-      alert('Password updated successfully')
-      resetPasswordForm()
-    }
+      if (passwordForm.value.newPassword.length < 3) {
+        passwordError.value = 'Password must be at least 3 characters long'
+        return
+      }
 
-    const deactivateAccount = () => {
-      if (
-        confirm(
-          'Are you sure you want to deactivate your account? You can reactivate it anytime by logging in.',
-        )
-      ) {
-        console.log('Deactivating account...')
-        alert('Account deactivated')
+      try {
+        isUpdatingPassword.value = true
+        const message = await changePassword(passwordForm.value.current, passwordForm.value.newPassword)
+        passwordMessage.value = message
+        resetPasswordForm()
+        alert('Password changed successfully. Please log in again.')
+      } catch (err: any) {
+        passwordError.value = err.message || 'Failed to change password. Please try again.'
+      } finally {
+        isUpdatingPassword.value = false
       }
     }
 
-    const deleteAccount = () => {
-      const confirmation = prompt('This action cannot be undone. Type "DELETE" to confirm:')
-      if (confirmation === 'DELETE') {
-        console.log('Deleting account...')
-        alert('Account deletion initiated')
+    const disableAccount = async () => {
+      if (
+        confirm(
+          'Are you sure you want to disable your account? You can reactivate it anytime by logging in.',
+        )
+      ) {
+        try {
+          if (!currentUser.value?.id) {
+            alert('User ID not found. Please log in again.')
+            return
+          }
+          await blockUser(currentUser.value.id)
+          alert('Your account has been disabled. You can reactivate it by logging in.')
+          logout()
+          router.push('/loginPage')
+        } catch (err: any) {
+          alert(err?.message || 'Failed to disable account')
+        }
+      }
+    }
+
+    const deleteAccount = async () => {
+      const confirmation = prompt('This action cannot be undone. Type "DELETE MY ACCOUNT" to confirm:')
+      if (confirmation === 'DELETE MY ACCOUNT') {
+        try {
+          if (!currentUser.value?.id) {
+            alert('User ID not found. Please log in again.')
+            return
+          }
+          await deleteUser(currentUser.value.id)
+          
+          // Clear authentication data
+          localStorage.removeItem('authToken')
+          localStorage.removeItem('user')
+          localStorage.removeItem('userRole')
+          
+          alert('Your account has been permanently deleted.')
+          router.push('/loginPage')
+        } catch (err: any) {
+          alert(err?.message || 'Failed to delete account')
+        }
+      } else if (confirmation !== null) {
+        alert('Account deletion cancelled. Please type the exact phrase to confirm.')
       }
     }
 
     return {
-      accountSettings,
       passwordForm,
-      toggleSetting,
+      isUpdatingPassword,
+      passwordMessage,
+      passwordError,
       handleLogout,
       resetPasswordForm,
       updatePassword,
-      deactivateAccount,
+      disableAccount,
       deleteAccount,
     }
   },

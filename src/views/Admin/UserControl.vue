@@ -297,387 +297,22 @@
   </div>
 </template>
 
-<script>
-import { ref, computed, defineComponent, onMounted } from 'vue'
+<script lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import Header from '../../components/Admin/NavigationBar.vue'
+import UserModal from '@/components/Admin/UserModal.vue'
 import {
   getAllUsers as apiGetAllUsers,
+  getUserById as apiGetUserById,
   register as apiRegister,
   updateUser as apiUpdateUser,
   deleteUser as apiDeleteUser,
+  blockUser as apiBlockUser,
+  activateUser as apiActivateUser,
+  updateUserActive as apiUpdateUserActive,
 } from '@/services/api'
 
-// UserModal Component
-const UserModal = defineComponent({
-  name: 'UserModal',
-  props: {
-    user: {
-      type: Object,
-      default: null,
-    },
-    mode: {
-      type: String,
-      required: true,
-    },
-  },
-  emits: ['close', 'save'],
-  setup(props, { emit }) {
-    // Enhanced user data with additional fields for view mode
-    const formData = ref(
-      props.user
-        ? {
-            ...props.user,
-            total_orders: props.user.total_orders || Math.floor(Math.random() * 20),
-            total_spent: props.user.total_spent || (Math.random() * 1000).toFixed(2),
-            last_order_date: props.user.last_order_date || '2026-01-15',
-            recent_orders: props.user.recent_orders || [
-              { id: 'ORD-001', date: '2026-01-15', amount: 89.99, status: 'delivered' },
-              { id: 'ORD-002', date: '2026-01-10', amount: 45.5, status: 'shipped' },
-              { id: 'ORD-003', date: '2026-01-05', amount: 120.0, status: 'processing' },
-            ],
-            recent_activity: props.user.recent_activity || [
-              { action: 'Placed order #ORD-001', timestamp: '2026-01-15 10:30 AM' },
-              { action: 'Updated profile information', timestamp: '2026-01-12 03:45 PM' },
-              { action: 'Changed password', timestamp: '2026-01-08 09:20 AM' },
-            ],
-          }
-        : {
-            name: '',
-            email: '',
-            password: '',
-            role: 'Customer',
-            status: 'Active',
-            phone: '',
-            address: '',
-            joinedDate: new Date().toISOString().split('T')[0],
-            total_orders: 0,
-            total_spent: 0,
-            recent_orders: [],
-            recent_activity: [],
-          },
-    )
-
-    const isViewMode = computed(() => props.mode === 'view')
-
-    const handleSubmit = () => {
-      if (!formData.value.name || !formData.value.email) {
-        alert('Please fill in name and email')
-        return
-      }
-
-      if (props.mode === 'add' && !formData.value.password) {
-        alert('Please provide a password for new user')
-        return
-      }
-
-      emit('save', { ...formData.value })
-    }
-
-    const close = () => {
-      emit('close')
-    }
-
-    return {
-      formData,
-      isViewMode,
-      handleSubmit,
-      close,
-    }
-  },
-  template: `
-    <div class="fixed inset-0 backdrop-blur-md bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div class="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="p-6 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-          <h2 class="text-2xl font-bold text-gray-900">
-            {{ mode === 'view' ? 'User Details' : mode === 'edit' ? 'Edit User' : 'Add New User' }}
-          </h2>
-          <button
-            @click="close"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <i class="pi pi-times text-xl"></i>
-          </button>
-        </div>
-
-        <div class="p-6">
-          <!-- View Mode - Enhanced Details -->
-          <div v-if="isViewMode" class="space-y-6">
-            <!-- User Stats Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm text-blue-800 font-medium">Total Orders</p>
-                    <p class="text-2xl font-bold text-blue-600">{{ formData.total_orders || 0 }}</p>
-                  </div>
-                  <i class="pi pi-shopping-cart text-blue-600 text-2xl"></i>
-                </div>
-              </div>
-              <div class="bg-green-50 rounded-lg p-4 border border-green-200">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm text-green-800 font-medium">Total Spent</p>
-                    <p class="text-2xl font-bold text-green-600">\${{ (formData.total_spent || 0).toFixed(2) }}</p>
-                  </div>
-                  <i class="pi pi-dollar text-green-600 text-2xl"></i>
-                </div>
-              </div>
-              <div class="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <p class="text-sm text-purple-800 font-medium">Last Order</p>
-                    <p class="text-sm font-bold text-purple-600">{{ formData.last_order_date || 'N/A' }}</p>
-                  </div>
-                  <i class="pi pi-calendar text-purple-600 text-2xl"></i>
-                </div>
-              </div>
-            </div>
-
-            <!-- Personal Information -->
-            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <i class="pi pi-user"></i>
-                Personal Information
-              </h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p class="text-sm text-gray-600">Full Name</p>
-                  <p class="font-medium text-gray-900">{{ formData.name }}</p>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600">Email Address</p>
-                  <p class="font-medium text-gray-900">{{ formData.email }}</p>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600">Phone Number</p>
-                  <p class="font-medium text-gray-900">{{ formData.phone || 'Not provided' }}</p>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600">Joined Date</p>
-                  <p class="font-medium text-gray-900">{{ new Date(formData.joinedDate).toLocaleDateString() }}</p>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600">Role</p>
-                  <span :class="[
-                    'px-3 py-1 rounded-full text-xs font-semibold inline-block',
-                    formData.role === 'Admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                  ]">
-                    {{ formData.role }}
-                  </span>
-                </div>
-                <div>
-                  <p class="text-sm text-gray-600">Account Status</p>
-                  <span :class="[
-                    'px-3 py-1 rounded-full text-xs font-semibold inline-block',
-                    formData.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                  ]">
-                    {{ formData.status }}
-                  </span>
-                </div>
-              </div>
-              <div v-if="formData.address" class="mt-4">
-                <p class="text-sm text-gray-600">Address</p>
-                <p class="font-medium text-gray-900">{{ formData.address }}</p>
-              </div>
-            </div>
-
-            <!-- Recent Orders -->
-            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <i class="pi pi-list"></i>
-                Recent Orders
-              </h3>
-              <div v-if="formData.recent_orders && formData.recent_orders.length > 0" class="space-y-2">
-                <div
-                  v-for="order in formData.recent_orders"
-                  :key="order.id"
-                  class="flex justify-between items-center p-3 bg-white rounded border border-gray-200"
-                >
-                  <div>
-                    <p class="font-medium text-gray-900">#{{ order.id }}</p>
-                    <p class="text-sm text-gray-500">{{ order.date }}</p>
-                  </div>
-                  <div class="text-right">
-                    <p class="font-semibold text-gray-900">\${{ order.amount.toFixed(2) }}</p>
-                    <span :class="[
-                      'px-2 py-1 rounded text-xs font-semibold',
-                      order.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                      order.status === 'shipped' ? 'bg-purple-100 text-purple-700' :
-                      order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    ]">
-                      {{ order.status }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="text-center py-6 text-gray-500">
-                <i class="pi pi-shopping-cart text-3xl mb-2"></i>
-                <p>No orders yet</p>
-              </div>
-            </div>
-
-            <!-- Activity Log -->
-            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <h3 class="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <i class="pi pi-history"></i>
-                Recent Activity
-              </h3>
-              <div class="space-y-2 max-h-40 overflow-y-auto">
-                <div v-for="(activity, index) in formData.recent_activity || []" :key="index" 
-                     class="flex items-start gap-3 p-2">
-                  <div class="w-2 h-2 bg-blue-600 rounded-full mt-1.5"></div>
-                  <div class="flex-1">
-                    <p class="text-sm text-gray-700">{{ activity.action }}</p>
-                    <p class="text-xs text-gray-500">{{ activity.timestamp }}</p>
-                  </div>
-                </div>
-                <div v-if="!formData.recent_activity || formData.recent_activity.length === 0" 
-                     class="text-center py-4 text-gray-500 text-sm">
-                  No recent activity
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Edit/Add Mode - Form -->
-          <div v-else class="space-y-4">
-            <!-- Name -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Full Name *
-              </label>
-              <input
-                v-model="formData.name"
-                type="text"
-                placeholder="Enter full name"
-                :disabled="isViewMode"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <!-- Email -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Email Address *
-              </label>
-              <input
-                v-model="formData.email"
-                type="email"
-                placeholder="user@example.com"
-                :disabled="isViewMode"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <!-- Password (only for add mode) -->
-            <div v-if="mode === 'add'">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Password *
-              </label>
-              <input
-                v-model="formData.password"
-                type="password"
-                placeholder="Enter password"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <!-- Phone -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Phone Number
-              </label>
-              <input
-                v-model="formData.phone"
-                type="tel"
-                placeholder="+1 (555) 123-4567"
-                :disabled="isViewMode"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
-
-            <!-- Address -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Address
-              </label>
-              <textarea
-                v-model="formData.address"
-                placeholder="Enter address"
-                :disabled="isViewMode"
-                rows="2"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              ></textarea>
-            </div>
-
-            <!-- Role and Status -->
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Role
-                </label>
-                <select
-                  v-model="formData.role"
-                  :disabled="isViewMode"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                >
-                  <option>Customer</option>
-                  <option>Admin</option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                  Status
-                </label>
-                <select
-                  v-model="formData.status"
-                  :disabled="isViewMode"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-                >
-                  <option>Active</option>
-                  <option>Blocked</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Joined Date (view/edit only) -->
-            <div v-if="mode !== 'add'">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                Joined Date
-              </label>
-              <input
-                v-model="formData.joinedDate"
-                type="date"
-                disabled
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50"
-              />
-            </div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="flex gap-3 mt-6">
-            <button
-              @click="close"
-              class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              {{ isViewMode ? 'Close' : 'Cancel' }}
-            </button>
-            <button
-              v-if="!isViewMode"
-              @click="handleSubmit"
-              class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors"
-            >
-              <i class="pi pi-save"></i>
-              {{ mode === 'edit' ? 'Save Changes' : 'Add User' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `,
-})
+// UserModal is implemented as a separate SFC to ensure template compilation
 
 export default {
   name: 'UserControl',
@@ -707,6 +342,41 @@ export default {
       return String(raw)
     }
 
+    // Local persistence for status overrides when backend does not expose status
+    const STATUS_OVERRIDES_KEY = 'userStatusOverrides'
+
+    const readStatusOverrides = () => {
+      try {
+        const raw = localStorage.getItem(STATUS_OVERRIDES_KEY)
+        return raw ? JSON.parse(raw) : {}
+      } catch {
+        return {}
+      }
+    }
+
+    const writeStatusOverrides = (obj) => {
+      try {
+        localStorage.setItem(STATUS_OVERRIDES_KEY, JSON.stringify(obj))
+      } catch (e) {
+        console.warn('Failed to write status overrides', e)
+      }
+    }
+
+    const setStatusOverride = (key, status) => {
+      const o = readStatusOverrides()
+      if (status === 'Active') {
+        delete o[key]
+      } else {
+        o[key] = status
+      }
+      writeStatusOverrides(o)
+    }
+
+    const getStatusOverride = (key) => {
+      const o = readStatusOverrides()
+      return o[key]
+    }
+
     const formatApiError = (e) => {
       try {
         if (!e) return 'Unknown error'
@@ -732,11 +402,21 @@ export default {
           backend_id: normalizeId(u._id) || normalizeId(u.id) || null,
           name: u.full_name || u.username || 'Unknown',
           email: u.email || '',
-          role: (u.role && (u.role === 'admin' || u.role === 'Admin')) ? 'Admin' : 'Customer',
-          status: u.status || 'Active',
+          role: u.role && (u.role === 'admin' || u.role === 'Admin') ? 'Admin' : 'Customer',
+          // Normalize status from backend (support `status` or `active`, various casing)
+          status: (() => {
+            const s = u.status ?? u.active ?? ''
+            const base = !s ? 'Active' : (String(s).toLowerCase() === 'blocked' ? 'Blocked' : 'Active')
+            // apply persisted override if present (keyed by backend id when available)
+            const key = normalizeId(u._id) || normalizeId(u.id) || `local:${idx + 1}`
+            const override = getStatusOverride(key)
+            return override || base
+          })(),
           phone: u.phone || '',
           address: u.address || '',
-          joinedDate: u.created_at ? new Date(u.created_at).toISOString().split('T')[0] : (u.joinedDate || new Date().toISOString().split('T')[0]),
+          joinedDate: u.created_at
+            ? new Date(u.created_at).toISOString().split('T')[0]
+            : u.joinedDate || new Date().toISOString().split('T')[0],
         }))
       } catch (e) {
         console.error('Failed to load users from API', e)
@@ -810,7 +490,50 @@ export default {
       showStatusDropdown.value = false
     }
 
-    const openModal = (mode, user = null) => {
+    const openModal = async (mode, user = null) => {
+      // mode 'add' doesn't need backend fetch
+      if (!user || mode === 'add') {
+        modalState.value = { isOpen: true, mode, user }
+        return
+      }
+
+      // Try to fetch full details from backend when possible
+      const backendId = normalizeId(user.backend_id) || normalizeId(user.id)
+      if (backendId) {
+        try {
+          const apiUser = await apiGetUserById(String(backendId))
+          // map backend user to UI shape expected by modal
+          const mapped = {
+            id: user.id || null,
+            backend_id: normalizeId(apiUser._id) || normalizeId(apiUser.id) || null,
+            name: apiUser.full_name || apiUser.username || user.name,
+            email: apiUser.email || user.email,
+            role: apiUser.role && (apiUser.role === 'admin' || apiUser.role === 'Admin') ? 'Admin' : 'Customer',
+            status: apiUser.active && apiUser.active.toLowerCase() === 'blocked' ? 'Blocked' : 'Active',
+            phone: apiUser.phone || user.phone || '',
+            address: apiUser.address || user.address || '',
+            joinedDate: apiUser.created_at ? new Date(apiUser.created_at).toISOString().split('T')[0] : (user.joinedDate || new Date().toISOString().split('T')[0]),
+            // detail-only fields for the modal
+            total_orders: (apiUser && apiUser.total_orders) || user.total_orders || Math.floor(Math.random() * 20),
+            total_spent: (apiUser && apiUser.total_spent) || user.total_spent || (Math.random() * 1000).toFixed(2),
+            last_order_date: (apiUser && apiUser.last_order_date) || user.last_order_date || null,
+            recent_orders: (apiUser && apiUser.recent_orders) || user.recent_orders || [],
+            recent_activity: (apiUser && apiUser.recent_activity) || user.recent_activity || [],
+          }
+          // apply any persisted override for this backend id
+          const overrideKey = mapped.backend_id || mapped.id || null
+          if (overrideKey) {
+            const ov = getStatusOverride(overrideKey)
+            if (ov) mapped.status = ov
+          }
+          modalState.value = { isOpen: true, mode, user: mapped }
+          return
+        } catch (e) {
+          console.warn('Failed to fetch user details from API, falling back to local user object', e)
+        }
+      }
+
+      // fallback: open modal with local/user-provided data
       modalState.value = { isOpen: true, mode, user }
     }
 
@@ -879,26 +602,32 @@ export default {
               // fallback: update local entry
               const idx = users.value.findIndex((u) => u.backend_id === backendId)
               if (idx !== -1) {
-                users.value[idx] = { ...users.value[idx], ...{
-                  name: userData.name,
-                  email: userData.email,
-                  address: userData.address,
-                  phone: userData.phone,
-                  role: userData.role === 'Admin' ? 'Admin' : 'Customer',
-                }}
+                users.value[idx] = {
+                  ...users.value[idx],
+                  ...{
+                    name: userData.name,
+                    email: userData.email,
+                    address: userData.address,
+                    phone: userData.phone,
+                    role: userData.role === 'Admin' ? 'Admin' : 'Customer',
+                  },
+                }
               }
             }
           } else {
             // no backend id - just update locally
             const idx = users.value.findIndex((u) => u.id === userData.id)
             if (idx !== -1) {
-              users.value[idx] = { ...users.value[idx], ...{
-                name: userData.name,
-                email: userData.email,
-                address: userData.address,
-                phone: userData.phone,
-                role: userData.role === 'Admin' ? 'Admin' : 'Customer',
-              }}
+              users.value[idx] = {
+                ...users.value[idx],
+                ...{
+                  name: userData.name,
+                  email: userData.email,
+                  address: userData.address,
+                  phone: userData.phone,
+                  role: userData.role === 'Admin' ? 'Admin' : 'Customer',
+                },
+              }
             }
           }
         }
@@ -917,19 +646,85 @@ export default {
 
       if (!confirm(`Are you sure you want to ${action} "${user.name}"?`)) return
 
+      // Normalize backend id (try both backend_id and id)
+      const backendId = normalizeId(user.backend_id) || normalizeId(user.id)
+      // API expects `active: 'active' | 'blocked'` (lowercase)
+      const apiStatus = newStatus === 'Active' ? 'active' : 'blocked'
+
+      const idx = users.value.findIndex((u) => u.id === user.id || normalizeId(u.backend_id) === normalizeId(user.backend_id))
+      const previousStatus = idx !== -1 ? users.value[idx].status : null
+
+      // Optimistic update
+      if (idx !== -1) users.value[idx].status = newStatus
+
       try {
-        const backendId = normalizeId(user.backend_id)
-        if (!backendId) throw new Error('Missing backend id')
-        const payload = { status: newStatus }
-        console.debug('API updateUser status', { id: backendId, payload })
-        await apiUpdateUser(String(backendId), payload)
-        await loadUsers()
+        // If no backend id, persist override locally and return
+        if (!backendId) {
+          const key = user.id ? `local:${user.id}` : `local:${idx + 1}`
+          if (key) setStatusOverride(key, newStatus)
+          return
+        }
+
+        // Try server endpoints in order of preference:
+        // 1) POST /api/users/{id}/block or /activate
+        // 2) PUT /api/users/{id} with { active: 'blocked'|'active' }
+        // 3) PUT /api/users/{id} with { active: boolean }
+        // 4) Fallback to legacy { status: 'Active'|'Blocked' }
+        let succeeded = false
+
+        try {
+          if (newStatus === 'Blocked') {
+            await apiBlockUser(String(backendId))
+          } else {
+            await apiActivateUser(String(backendId))
+          }
+          succeeded = true
+        } catch (err) {
+          console.warn('POST block/activate failed, will try PUT payloads', err)
+        }
+
+        if (!succeeded) {
+          try {
+            await apiUpdateUserActive(String(backendId), apiStatus)
+            succeeded = true
+          } catch (err) {
+            console.warn('PUT { active: string } failed, trying boolean', err)
+          }
+        }
+
+        if (!succeeded) {
+          try {
+            await apiUpdateUserActive(String(backendId), apiStatus === 'active')
+            succeeded = true
+          } catch (err) {
+            console.warn('PUT { active: boolean } failed, trying legacy status field', err)
+          }
+        }
+
+        if (!succeeded) {
+          try {
+            await apiUpdateUser(String(backendId), { status: newStatus })
+            succeeded = true
+          } catch (err) {
+            console.warn('PUT { status } failed', err)
+          }
+        }
+
+        if (succeeded) {
+          const key = backendId || (user.id ? `local:${user.id}` : `local:${idx + 1}`)
+          if (key) setStatusOverride(key, newStatus)
+          if (idx !== -1) users.value[idx].status = newStatus
+          return
+        }
+
+        throw new Error('All update attempts failed')
       } catch (e) {
         console.error('Failed to toggle user status', e)
+        // revert optimistic change
+        if (idx !== -1) users.value[idx].status = previousStatus
         const msg = formatApiError(e)
         lastApiError.value = msg
         try {
-          console.error('toggleUserStatus error full:', e)
           alert('Failed to change user status: ' + msg)
         } catch (err) {
           console.error('Error showing toggle status alert', err)
@@ -938,7 +733,8 @@ export default {
     }
 
     const deleteUser = async (user) => {
-      if (!confirm(`Are you sure you want to delete "${user.name}"? This action cannot be undone.`)) return
+      if (!confirm(`Are you sure you want to delete "${user.name}"? This action cannot be undone.`))
+        return
       try {
         const backendId = normalizeId(user.backend_id)
         if (!backendId) throw new Error('Missing backend id')
@@ -1005,7 +801,7 @@ export default {
       getAvatarColor,
       loading,
       error,
-        lastApiError,
+      lastApiError,
     }
   },
 }

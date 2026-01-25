@@ -54,13 +54,20 @@
         </li>
       </ul>
 
-      <div class="hidden md:flex gap-4 text-lg">
+      <div class="hidden md:flex gap-4 text-lg items-center">
         <router-link to="/client/products" class="cursor-pointer">
           <i class="pi pi-search text-2xl"></i>
         </router-link>
         <div class="relative">
-          <button @click="showProfileMenu = !showProfileMenu" class="cursor-pointer">
-            <i class="pi pi-user text-2xl"></i>
+          <button
+            @click="showProfileMenu = !showProfileMenu"
+            class="cursor-pointer flex items-center gap-2"
+          >
+            <div v-if="currentUser" class="flex items-center gap-2">
+              <i class="pi pi-user text-2xl"></i>
+              <span class="text-sm font-medium hidden lg:block">{{ currentUser.full_name }}</span>
+            </div>
+            <i v-else class="pi pi-user text-2xl"></i>
           </button>
           <transition
             enter-active-class="transition duration-200 ease-out"
@@ -72,8 +79,12 @@
           >
             <div
               v-if="showProfileMenu"
-              class="absolute right-0 mt-[12px] bg-white text-black rounded-lg shadow-xl min-w-[160px] py-2 z-50 border border-gray-100 overflow-hidden"
+              class="absolute right-0 mt-[12px] bg-white text-black rounded-lg shadow-xl min-w-[200px] py-2 z-50 border border-gray-100 overflow-hidden"
             >
+              <div v-if="currentUser" class="px-4 py-3 border-b border-gray-100">
+                <p class="font-semibold text-sm">{{ currentUser.full_name }}</p>
+                <p class="text-xs text-gray-500">{{ currentUser.email }}</p>
+              </div>
               <router-link
                 to="/client/profile"
                 class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2"
@@ -97,6 +108,23 @@
               >
                 <i class="pi pi-cog"></i>
                 Settings
+              </router-link>
+              <button
+                v-if="isAuthenticated"
+                @click="handleLogout"
+                class="w-full text-left block px-4 py-2.5 hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 border-t border-gray-100"
+              >
+                <i class="pi pi-sign-out"></i>
+                Logout
+              </button>
+              <router-link
+                v-else
+                to="/LoginPage"
+                class="block px-4 py-2.5 hover:bg-[#5F6FFF] hover:text-white transition-colors flex items-center gap-2 border-t border-gray-100"
+                @click="showProfileMenu = false"
+              >
+                <i class="pi pi-sign-in"></i>
+                Login
               </router-link>
             </div>
           </transition>
@@ -167,26 +195,32 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useCartStore } from '@/stores/cart'
-import { useScrollDirection } from '@/composables/useScrollDirection'
-import logo from '@/assets/logo.png'
-import { getAllGroups, getCategoriesByGroup } from '@/services/api'
+import { useCartStore } from '../../stores/cart'
+import { useScrollDirection } from '../../composables/useScrollDirection'
+import { useAuth } from '../../composables/useAuth'
+import { getAllGroups, getCategoriesByGroup } from '../../services/api'
 
 const cartStore = useCartStore()
+const { currentUser, isAuthenticated, logout } = useAuth()
 const isMenuOpen = ref(false)
 const showProfileMenu = ref(false)
 
 // Dropdown menus (populated from backend groups/categories)
-const dropdowns = reactive([] as Array<{ title: string; open: boolean; items: Array<{ name: string; link: string }> }>)
+const dropdowns = reactive(
+  [] as Array<{ title: string; open: boolean; items: Array<{ name: string; link: string }> }>,
+)
 
 const fetchNavGroups = async () => {
   try {
     const groups = await getAllGroups()
-    console.log('Navbar: fetched groups', groups)
 
     if (!groups || groups.length === 0) {
       // fallback
-      dropdowns.push({ title: 'SHOP', open: false, items: [{ name: 'All', link: '/client/products' }] })
+      dropdowns.push({
+        title: 'SHOP',
+        open: false,
+        items: [{ name: 'All', link: '/client/products' }],
+      })
       return
     }
 
@@ -203,7 +237,6 @@ const fetchNavGroups = async () => {
         groupId = String((g as any).slug)
       }
       if (!groupId) {
-        console.warn('Navbar: group missing id, skipping categories for', g)
         return {
           title: g.name,
           items: [],
@@ -211,7 +244,6 @@ const fetchNavGroups = async () => {
       }
       try {
         const categories = await getCategoriesByGroup(groupId)
-        console.log(`Navbar: categories for group ${g.name}`, categories)
         return {
           title: g.name,
           items: categories.map((c) => ({
@@ -220,7 +252,6 @@ const fetchNavGroups = async () => {
           })),
         }
       } catch (e) {
-        console.error('Navbar: failed to fetch categories for', g, e)
         return {
           title: g.name,
           items: [],
@@ -231,10 +262,13 @@ const fetchNavGroups = async () => {
     const results = await Promise.all(fetches)
     results.forEach((r) => dropdowns.push({ title: r.title, open: false, items: r.items }))
   } catch (err) {
-    console.error('Failed to load nav groups/categories', err)
     // on error, provide a reasonable fallback
     if (dropdowns.length === 0) {
-      dropdowns.push({ title: 'SHOP', open: false, items: [{ name: 'Products', link: '/client/products' }] })
+      dropdowns.push({
+        title: 'SHOP',
+        open: false,
+        items: [{ name: 'Products', link: '/client/products' }],
+      })
     }
   }
 }
@@ -264,8 +298,11 @@ const toggleDropdown = (index) => {
     }
   })
 }
+
+const handleLogout = () => {
+  showProfileMenu.value = false
+  logout()
+}
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

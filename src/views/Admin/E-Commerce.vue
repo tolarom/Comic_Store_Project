@@ -134,9 +134,9 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
 import { ref, computed, defineComponent, onMounted } from 'vue'
-import ProductCard from '../../components/Admin/ProductCard.vue'
+import ProductCard from '@/components/Admin/ProductCard.vue'
 
 // ProductModal Component
 const ProductModal = defineComponent({
@@ -174,12 +174,44 @@ const ProductModal = defineComponent({
           },
     )
 
+    const ratings = ref([])
     const imageInputMode = ref('url') // 'url' or 'file'
     const imagePreview = ref(formData.value.image)
     const selectedFileName = ref('')
     const fileInput = ref(null)
 
     const isViewMode = computed(() => props.mode === 'view')
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      if (!dateString) return ''
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+    }
+
+    // Load ratings when modal opens in view mode
+    const loadRatings = async () => {
+      if (props.mode === 'view' && props.product && (props.product.id || props.product._id || props.product.backend?._id)) {
+        try {
+          const productId = props.product.id || props.product._id || props.product.backend?._id
+          const productRatings = await getRatingsByProduct(String(productId))
+          ratings.value = productRatings || []
+          
+          // Calculate average rating
+          if (productRatings && productRatings.length > 0) {
+            const avgRating = productRatings.reduce((sum, r) => sum + r.rating, 0) / productRatings.length
+            formData.value.rating = avgRating
+            formData.value.reviewCount = productRatings.length
+          }
+        } catch {
+          // Failed to load ratings
+        }
+      }
+    }
+
+    onMounted(() => {
+      loadRatings()
+    })
 
     const updateImagePreview = () => {
       imagePreview.value = formData.value.image
@@ -227,9 +259,9 @@ const ProductModal = defineComponent({
 
       emit('save', {
         ...formData.value,
-        price: parseFloat(formData.value.price),
-        stock: parseInt(formData.value.stock),
-        sales: parseInt(formData.value.sales || 0),
+        price: parseFloat(String(formData.value.price || '0')),
+        stock: parseInt(String(formData.value.stock || '0'), 10),
+        sales: parseInt(String(formData.value.sales || 0), 10),
       })
     }
 
@@ -239,11 +271,13 @@ const ProductModal = defineComponent({
 
     return {
       formData,
+      ratings,
       isViewMode,
       imageInputMode,
       imagePreview,
       selectedFileName,
       fileInput,
+      formatDate,
       updateImagePreview,
       handleFileUpload,
       handleSubmit,
@@ -458,7 +492,36 @@ const ProductModal = defineComponent({
                 </div>
                 <span class="text-lg font-semibold text-gray-700">{{ (formData.rating || 0).toFixed(1) }}</span>
                 <span v-if="formData.reviewCount" class="text-sm text-gray-500">({{ formData.reviewCount }} reviews)</span>
-          </div>
+              </div>
+            </div>
+
+            <!-- User Reviews/Ratings Section (View Mode Only) -->
+            <div v-if="isViewMode && ratings.length > 0" class="mt-6 pt-6 border-t border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-900 mb-4">User Reviews & Comments</h3>
+              <div class="space-y-4 max-h-[300px] overflow-y-auto">
+                <div v-for="rating in ratings" :key="rating._id || rating.id" class="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <!-- Review Header -->
+                  <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center gap-2">
+                      <!-- Star Rating -->
+                      <div class="flex items-center">
+                        <span v-for="star in 5" :key="star" class="text-sm">
+                          <i :class="star <= rating.rating ? 'pi pi-star-fill text-yellow-400' : 'pi pi-star text-gray-300'"></i>
+                        </span>
+                      </div>
+                      <span class="font-semibold text-gray-900">{{ rating.rating }}/5</span>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ formatDate(rating.created_at) }}</span>
+                  </div>
+                  <!-- Review Comment -->
+                  <p class="text-gray-700 text-sm">{{ rating.review || 'No comment provided' }}</p>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="isViewMode && ratings.length === 0" class="mt-6 pt-6 border-t border-gray-200">
+              <p class="text-gray-500 text-center">No reviews yet for this product</p>
+            </div>
 
           <!-- Action Buttons -->
           <div class="flex gap-3 mt-6">
@@ -489,6 +552,7 @@ import {
   updateProduct as apiUpdateProduct,
   deleteProduct as apiDeleteProduct,
   getAllCategories as apiGetAllCategories,
+  getRatingsByProduct,
 } from '@/services/api'
 
 export default {
@@ -625,7 +689,6 @@ export default {
       }
       try {
         if (modalState.value.mode === 'add') {
-          console.debug('[E-Commerce] POST /api/products', payload)
           const created = await apiCreateProduct(payload)
           products.value.unshift({
             id: created._id || created.id,
@@ -640,14 +703,7 @@ export default {
           })
         } else if (modalState.value.mode === 'edit') {
           const id = normalizeId(productData.id || productData._id || productData.backend?._id)
-          console.debug('[E-Commerce] PUT /api/products/' + id, {
-            title: payload.title,
-            description: payload.description,
-            price: payload.price,
-            category: payload.category,
-            stock: payload.stock,
-            image_url: payload.image_url,
-          })
+
           await apiUpdateProduct(String(id), {
             title: payload.title,
             description: payload.description,
@@ -658,7 +714,18 @@ export default {
             discount: payload.discount,
           })
           const idx = products.value.findIndex((p) => String(p.id) === String(id))
-          if (idx !== -1) products.value[idx] = { ...products.value[idx], ...payload }
+          if (idx !== -1) {
+            products.value[idx] = { 
+              ...products.value[idx], 
+              name: payload.title,
+              description: payload.description,
+              price: payload.price,
+              category: payload.category,
+              stock: payload.stock,
+              image: payload.image_url,
+              discount: payload.discount,
+            }
+          }
         }
         closeModal()
       } catch (e) {
@@ -675,15 +742,9 @@ export default {
       if (!confirm(`Are you sure you want to delete "${product.name}"?`)) return
       try {
         const id = normalizeId(product.id || product._id || product.backend?._id)
-        console.debug('[E-Commerce] DELETE /api/products/' + id)
         await apiDeleteProduct(String(id))
         products.value = products.value.filter((p) => String(p.id) !== String(id))
-      } catch (e) {
-        console.error('Failed to delete product via API', e)
-        try {
-          if (e?.response) console.error('Server response:', e.response.data)
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (__) {}
+      } catch {
         alert('Failed to delete product. Check console for details.')
       }
     }

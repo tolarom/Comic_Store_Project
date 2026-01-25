@@ -55,9 +55,11 @@
           <!-- Login button -->
           <button
             type="submit"
-            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg text-lg transition"
+            :disabled="isLoading"
+            class="w-full bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-3 rounded-lg text-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            Log In
+            <i v-if="isLoading" class="pi pi-spin pi-spinner"></i>
+            <span>{{ isLoading ? 'Logging in...' : 'Log In' }}</span>
           </button>
 
           <p class="text-center text-sm text-gray-700">
@@ -72,29 +74,31 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import poster1 from '@/assets/poster1.png'
+import { useAuth } from '../../composables/useAuth'
+const poster1 = '/src/assets/poster1.png'
 
-const router = useRouter()
+const { login, isLoading, error } = useAuth()
+
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const errorMessage = ref('')
 
-const onSubmit = () => {
+const onSubmit = async () => {
   errorMessage.value = ''
+  error.value = null
 
   if (!email.value || !password.value) {
     errorMessage.value = 'Please fill in all fields'
     return
   }
 
-  // Save user info
-  localStorage.setItem('authToken', 'mock-jwt-token-' + Date.now())
-  localStorage.setItem('userEmail', email.value)
-
-  // Redirect to home
-  router.push('/')
+  try {
+    await login(email.value, password.value)
+    // Router push is handled in useAuth
+  } catch (err) {
+    errorMessage.value = err instanceof Error ? err.message : 'Login failed. Please check your credentials.'
+  }
 }
 </script>
 

@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { isAuthenticated, isAdmin } from '@/services/api'
 
 import LoginPage from '@/views/Auth/LogIn-Page.vue'
 import SignUpPage from '@/views/Auth/SignUp-Page.vue'
 import ShopCart from '@/views/Client/ShopCart-Page.vue'
 import Checkout from '@/views/Client/Checkout-Page.vue'
 import Profile from '@/views/Client/profileview-Page.vue'
+import EditProfile from '@/views/Client/EditProfile-Page.vue'
 import Homeview from '@/views/Client/Homeview-Page.vue'
 import ProductPage from '@/views/Client/product-page.vue'
 import ProductDetail from '@/views/Client/Product-detail.vue'
@@ -14,6 +16,7 @@ import PurchaseHistory from '@/views/Client/PurchaseHistory.vue'
 import AdminDashboard from '@/views/Admin/Dashboard.vue'
 import ECommerce from '@/views/Admin/E-Commerce.vue'
 import Admin_profile from '@/views/Admin/Admin_profile.vue'
+import EditAdminProfile from '@/views/Admin/EditAdminProfile.vue'
 import Setting from '@/views/Admin/Setting.vue'
 import UserControl from '@/views/Admin/UserControl.vue'
 import OrderHistory from '@/views/Admin/OrderHistory.vue'
@@ -44,7 +47,7 @@ const routes = [
     path: '/client/shop',
     name: 'Homeview',
     component: Homeview,
-    meta: { requiresAuth: true, title: 'Home' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Home' },
   },
 
   // Product routes
@@ -52,50 +55,56 @@ const routes = [
     path: '/client/products',
     name: 'ProductPage',
     component: ProductPage,
-    meta: { requiresAuth: true, title: 'Shop' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Shop' },
   },
   {
     path: '/client/products/:id',
     name: 'ProductDetail',
     component: ProductDetail,
-    meta: { requiresAuth: true, title: 'Product Details' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Product Details' },
   },
 
   {
     path: '/client/cart',
     name: 'ShopCart',
     component: ShopCart,
-    meta: { requiresAuth: true, title: 'Shopping Cart' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Shopping Cart' },
   },
   {
     path: '/client/checkout',
     name: 'CheckOut',
     component: Checkout,
-    meta: { requiresAuth: true, title: 'Checkout' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Checkout' },
   },
   {
     path: '/client/profile',
     name: 'Profile',
     component: Profile,
-    meta: { requiresAuth: true, title: 'My Profile' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'My Profile' },
+  },
+  {
+    path: '/client/profile/edit',
+    name: 'EditProfile',
+    component: EditProfile,
+    meta: { requiresAuth: true, requiresClient: true, title: 'Edit Profile' },
   },
   {
     path: '/client/rating',
     name: 'Rating',
     component: RatingPage,
-    meta: { requiresAuth: true, title: 'Leave a Rating' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Leave a Rating' },
   },
   {
     path: '/client/settings',
     name: 'ClientSettings',
     component: ClientSettings,
-    meta: { requiresAuth: true, title: 'Account Settings' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Account Settings' },
   },
   {
     path: '/client/orders',
     name: 'PurchaseHistory',
     component: PurchaseHistory,
-    meta: { requiresAuth: true, title: 'Purchase History' },
+    meta: { requiresAuth: true, requiresClient: true, title: 'Purchase History' },
   },
 
   // Admin routes
@@ -120,6 +129,12 @@ const routes = [
     path: '/admin/profile',
     name: 'AdminProfile',
     component: Admin_profile,
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/admin/profile/edit',
+    name: 'EditAdminProfile',
+    component: EditAdminProfile,
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
@@ -161,6 +176,41 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const title = to.meta.title ? `${to.meta.title} - Comic Store` : 'Comic Store'
   document.title = title
+  
+  const requiresAuth = to.meta.requiresAuth as boolean || false
+  const requiresAdmin = to.meta.requiresAdmin as boolean || false
+  const requiresClient = to.meta.requiresClient as boolean || false
+  const isUserAuthenticated = isAuthenticated()
+  const isUserAdmin = isAdmin()
+  
+  // If route requires authentication
+  if (requiresAuth && !isUserAuthenticated) {
+    // Redirect to login
+    next({ name: 'LoginPage' })
+    return
+  }
+  
+  // If route requires admin role and user is not admin
+  if (requiresAdmin && !isUserAdmin) {
+    // Redirect to home if not admin
+    next({ name: 'Homeview' })
+    return
+  }
+  
+  // If route requires client role and user is admin
+  if (requiresClient && isUserAdmin) {
+    // Redirect to admin dashboard if user is admin
+    next({ name: 'Dashboard' })
+    return
+  }
+  
+  // If user is authenticated and trying to access login/signup, redirect to appropriate home
+  if ((to.path === '/loginPage' || to.path === '/signUpPage') && isUserAuthenticated) {
+    // Redirect admin to dashboard, client to shop
+    next({ name: isUserAdmin ? 'Dashboard' : 'Homeview' })
+    return
+  }
+  
   next()
 })
 

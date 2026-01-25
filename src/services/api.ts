@@ -70,7 +70,11 @@ export interface User {
   full_name: string
   address: string
   phone: string
+  image_url?: string
+  gender: string
+  country: string
   role: 'admin' | 'customer'
+  status: 'active' | 'blocked'
   created_at?: string
   updated_at?: string
 }
@@ -82,7 +86,26 @@ export interface CreateUserRequest {
   full_name: string
   address: string
   phone: string
+  image_url?: string
   role?: 'admin' | 'customer'
+  country?: string
+  gender?: string
+  status?: 'active' | 'blocked'
+}
+
+export interface UpdateUserRequest {
+  username?: string
+  email?: string
+  password?: string
+  full_name?: string
+  address?: string
+  phone?: string
+  image_url?: string
+  role?: string
+  country?: string
+  gender?: string
+  status?: string
+  active?: string | boolean
 }
 
 export interface LoginResponse {
@@ -104,6 +127,7 @@ export interface Order {
   products: OrderItem[]
   total_price: number
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+  order_type?: 'shipping' | 'pickup'
   created_at?: string
   updated_at?: string
 }
@@ -165,7 +189,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Clear token and redirect to login
       localStorage.removeItem('authToken')
-      window.location.href = '/login'
+      localStorage.removeItem('user')
+      window.location.href = '/loginPage'
     }
     return Promise.reject(error)
   },
@@ -258,37 +283,61 @@ export async function getProductsByCategory(category: string): Promise<Product[]
 
 export async function register(userData: CreateUserRequest): Promise<User> {
   try {
-    const response = await apiClient.post<any, ApiResponse<User>>('/api/users', userData)
+    const response = await apiClient.post<any, any>('/api/auth/register', userData)
+    
     if (!response.data) {
       throw new Error('Failed to register user')
     }
-    return response.data
-  } catch (error) {
+
+    // If registration returns a token (auto-login), store it
+    if (response.data.token) {
+      localStorage.setItem('authToken', response.data.token)
+    }
+    
+    return response.data.user || response.data
+  } catch (error: any) {
     console.error('Error registering user:', error)
-    throw error
+    throw new Error(error?.response?.data?.message || 'Registration failed')
   }
 }
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   try {
-    const response = await apiClient.post<any, ApiResponse<LoginResponse>>('/api/auth/login', {
+    const response = await apiClient.post<any, any>('/api/auth/login', {
       email,
       password,
     })
-    if (!response.data) {
-      throw new Error('Login failed')
+
+    if (!response.data || !response.data.token) {
+      throw new Error('Login failed - no token received')
     }
 
     // Store token and user
-    if (response.data.token) {
-      localStorage.setItem('authToken', response.data.token)
-      localStorage.setItem('user', JSON.stringify(response.data.user))
-    }
+    localStorage.setItem('authToken', response.data.token)
+    localStorage.setItem('user', JSON.stringify(response.data.user))
 
-    return response.data
-  } catch (error) {
+    return {
+      token: response.data.token,
+      user: response.data.user,
+    }
+  } catch (error: any) {
     console.error('Error logging in:', error)
-    throw error
+    const errorMsg = error?.response?.data?.message || error?.message || 'Login failed'
+    throw new Error(errorMsg)
+  }
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<string> {
+  try {
+    const response = await apiClient.put<any, ApiResponse<string>>('/api/auth/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    return response.message || 'Password changed successfully'
+  } catch (error: any) {
+    console.error('Error changing password:', error)
+    const errorMsg = error?.response?.data?.message || error?.message || 'Failed to change password'
+    throw new Error(errorMsg)
   }
 }
 
@@ -340,16 +389,75 @@ export async function getUserById(id: string): Promise<User> {
   }
 }
 
-export async function updateUser(id: string, userData: Partial<User>): Promise<string> {
+export async function updateUser(id: string, userData: UpdateUserRequest): Promise<string> {
   try {
-    const response = await apiClient.put<any, ApiResponse<User>>(`/api/users/${id}`, userData)
+    // Remove password field if it's empty or undefined (don't update password)
+    const cleanedData = { ...userData } as any
+    if (!cleanedData.password) {
+      delete cleanedData.password
+    }
+    
+    const response = await apiClient.put<any, ApiResponse<User>>(`/api/users/${id}`, cleanedData)
+    
+    // Update stored user data with the response
+    const currentUser = getCurrentUser()
+    if (currentUser) {
+      // Merge the updated fields with current user
+      const updatedUser = {
+        ...currentUser,
+        ...cleanedData,
+        _id: currentUser._id,
+        id: currentUser.id
+      }
+      
+      // If backend returned updated user data, use that
+      if (response.data) {
+        localStorage.setItem('user', JSON.stringify(response.data))
+      } else {
+        // Otherwise use our merged data
+        localStorage.setItem('user', JSON.stringify(updatedUser))
+      }
+    }
+    
+    return response.message || 'User updated successfully'
+  } catch (error: any) {
+    console.error('Error updating user:', error)
+    const errorMsg = error?.response?.data?.message || error?.message || 'Failed to update user'
+    throw new Error(errorMsg)
+  }
+}
+
+// Convenience helpers for user status actions
+export async function blockUser(id: string): Promise<string> {
+  try {
+    const response = await apiClient.post<any, ApiResponse<string>>(`/api/users/${id}/block`)
+    return response.message || 'User blocked successfully'
+  } catch (error) {
+    console.error('Error blocking user:', error)
+    throw error
+  }
+}
+
+export async function activateUser(id: string): Promise<string> {
+  try {
+    const response = await apiClient.post<any, ApiResponse<string>>(`/api/users/${id}/activate`)
+    return response.message || 'User activated successfully'
+  } catch (error) {
+    console.error('Error activating user:', error)
+    throw error
+  }
+}
+
+export async function updateUserActive(id: string, active: string | boolean): Promise<string> {
+  try {
+    const payload = typeof active === 'boolean' ? { active } : { active: String(active) }
+    const response = await apiClient.put<any, ApiResponse<User>>(`/api/users/${id}`, payload)
     if (response.data && response.data._id) {
-      // Update stored user data
       localStorage.setItem('user', JSON.stringify(response.data))
     }
     return response.message || 'User updated successfully'
   } catch (error) {
-    console.error('Error updating user:', error)
+    console.error('Error updating user active status:', error)
     throw error
   }
 }
