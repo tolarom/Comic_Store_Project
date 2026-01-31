@@ -28,8 +28,8 @@
         <!-- Sort By -->
         <div class="sort-by">
           <label class="text-sm mr-2">SORT BY:</label>
-          <select 
-            class="border border-gray-400 rounded px-3 py-1 text-sm" 
+          <select
+            class="border border-gray-400 rounded px-3 py-1 text-sm"
             v-model="sortOption"
             :disabled="loading"
           >
@@ -63,7 +63,7 @@
     <!-- Products Section -->
     <div v-else>
       <h2 class="section-title">Products</h2>
-      
+
       <!-- No Products Message -->
       <div v-if="paginatedProducts.length === 0" class="no-products">
         <p>No products found matching your criteria.</p>
@@ -186,23 +186,23 @@ onMounted(async () => {
     loading.value = true
     error.value = null
     console.log('Fetching products from store...')
-    
+
     await productsStore.fetchProducts()
-    
+
     if (productsStore.products.length === 0) {
       error.value = 'No products found. Backend may be down.'
     } else {
       // Load ratings for all products
       await loadRatingsForProducts(productsStore.products)
     }
-    
+
     loading.value = false
   } catch (err) {
     console.error('Error fetching products:', err)
     error.value = err instanceof Error ? err.message : 'Failed to load products'
     loading.value = false
   }
-  
+
   // Load categories for dropdown
   loadCategories()
 })
@@ -212,9 +212,15 @@ const products = computed(() => {
   return selectedCategory.value === 'all' ? productsStore.products : apiProducts.value
 })
 
-const sortOption = ref<'default' | 'price-low' | 'price-high' | 'discount-price-low' | 'discount-price-high' | 'alpha-asc' | 'alpha-desc'>(
-  'default',
-)
+const sortOption = ref<
+  | 'default'
+  | 'price-low'
+  | 'price-high'
+  | 'discount-price-low'
+  | 'discount-price-high'
+  | 'alpha-asc'
+  | 'alpha-desc'
+>('default')
 const selectedCategory = ref<string>('all')
 
 // Pagination
@@ -225,8 +231,6 @@ const itemsPerPage = 12
 watch([searchQuery, selectedCategory], () => {
   currentPage.value = 1
 })
-
-
 
 // Keep URL in sync when user changes category via dropdown
 watch(selectedCategory, (cat) => {
@@ -250,8 +254,8 @@ watch(
     if (normalized !== selectedCategory.value) {
       selectedCategory.value = normalized
     }
-  }
- , { immediate: true }
+  },
+  { immediate: true },
 )
 
 // Helper function to calculate price after discount
@@ -363,13 +367,13 @@ const reloadProducts = async () => {
   try {
     loading.value = true
     error.value = null
-    
+
     await productsStore.fetchProducts()
-    
+
     if (productsStore.products.length === 0) {
       error.value = 'No products found'
     }
-    
+
     loading.value = false
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Error loading products'
@@ -388,20 +392,35 @@ async function fetchProductsForCategory(cat: string) {
   try {
     const backend = await getProductsByCategory(cat)
     // map backend Product -> ProductItem similar to store
-    apiProducts.value = backend.map((p: any, idx: number) => ({
-      id: idx + 1,
-      title: p.title || 'Untitled',
-      subtitle: p.category || 'Product',
-      description: p.description || '',
-      price: p.price || 0,
-      discount: 0,
-      rating: 0,
-      reviewCount: 0,
-      image: p.image_url || '',
-      category: p.category || '',
-      stock: p.stock || 0,
-      sales: 0,
-    }))
+    apiProducts.value = backend.map((p: any, idx: number) => {
+      // Extract backend_id properly - it might be an object or string
+      let backendId = ''
+      if (p._id) {
+        backendId = typeof p._id === 'object' ? (p._id as any).$oid || String(p._id) : String(p._id)
+      } else if (p.id) {
+        backendId = typeof p.id === 'object' ? (p.id as any).$oid || String(p.id) : String(p.id)
+      }
+
+      // Try to find matching product from the main store to use its ID
+      const existingProduct = productsStore.products.find(ep => ep.backend_id === backendId)
+      const productId = existingProduct ? existingProduct.id : (idx + 1000)
+
+      return {
+        id: productId,
+        backend_id: backendId,
+        title: p.title || 'Untitled',
+        subtitle: p.category || 'Product',
+        description: p.description || '',
+        price: p.price || 0,
+        discount: (p as any).discount ?? (p as any).discount_percent ?? 0,
+        rating: 0,
+        reviewCount: 0,
+        image: p.image_url || '',
+        category: p.category || '',
+        stock: p.stock || 0,
+        sales: 0,
+      }
+    })
     // Load ratings for category products
     await loadRatingsForProducts(apiProducts.value)
     loading.value = false
@@ -450,7 +469,8 @@ select {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

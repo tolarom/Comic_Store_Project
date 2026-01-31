@@ -177,7 +177,7 @@ const fetchNavGroups = async () => {
 
     // Fetch categories in parallel for all groups
     const fetches = groups.map(async (g) => {
-      // normalize group id to string - backend returns _id: { $oid: '...' }
+
       let groupId = ''
       if ((g as any)._id) {
         const raw = (g as any)._id

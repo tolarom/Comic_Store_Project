@@ -197,9 +197,7 @@ const onAddToCart = () => {
     cartStore.addToCart({ id: p.id, backend_id: (p as any).backend_id, name: p.title, price, image: p.image })
   }
 
-  // Reset quantity after adding
-  qty.value = 1
-  alert(`${qty.value === 1 ? '1 item' : qty.value + ' items'} added to cart!`)
+  alert(`${qty.value} items added to cart!`)
 }
 
 // --- Reviews state & actions ---
